@@ -180,6 +180,105 @@ ENDPART
         expect(@delivery_report.diagnostic_code).to be_nil
       end
     end
+
+    describe "with more than one recipient" do
+      # alice is a transient failure without a Diagnostic-Code; bob is a
+      # permanent failure with a (folded) Diagnostic-Code and an extension
+      # field. Optional fields therefore differ between the two records.
+      let(:alice_block) do
+        <<ENDPART
+Final-Recipient: RFC822; alice@example.com
+Action: delayed
+Status: 4.2.2
+Remote-MTA: DNS; mx.example.com
+ENDPART
+      end
+
+      let(:bob_block) do
+        <<ENDPART
+Final-Recipient: RFC822; bob@example.com
+Action: failed
+Status: 5.1.1
+Remote-MTA: DNS; mx.example.com
+Diagnostic-Code: SMTP; 550 5.1.1
+    mailbox does not exist
+X-Example-Extension: extension-value
+ENDPART
+      end
+
+      let(:report_block) do
+        <<ENDPART
+Reporting-MTA: dns; mail.example.com
+Arrival-Date: Mon, 24 Dec 2007 10:03:47 +1100
+X-Postfix-Queue-ID: 12345
+ENDPART
+      end
+
+      def build_part(recipient_blocks)
+        body = report_block + "\n" + recipient_blocks.join("\n")
+        Mail::Part.new(Mail::Utilities.to_crlf(
+          "Content-Type: message/delivery-status\n\n#{body}"))
+      end
+
+      let(:part) { build_part([alice_block, bob_block]) }
+
+      it "keeps report level fields separate from recipient records" do
+        expect(part.delivery_status_report['reporting-mta'])
+          .to eq 'dns; mail.example.com'
+        expect(part.delivery_status_report['x-postfix-queue-id']).to eq '12345'
+        expect(part.recipient_reports.size).to eq 2
+      end
+
+      it "returns nil padded arrays so missing optional fields stay aligned" do
+        expect(part.final_recipient)
+          .to eq ['RFC822; alice@example.com', 'RFC822; bob@example.com']
+        expect(part.action).to eq ['delayed', 'failed']
+        expect(part.error_status).to eq ['4.2.2', '5.1.1']
+        expect(part.diagnostic_code)
+          .to eq [nil, 'SMTP; 550 5.1.1    mailbox does not exist']
+      end
+
+      it "unfolds folded fields and reads unknown extension fields" do
+        bob = part.recipient_reports.last
+        expect(bob.diagnostic_code)
+          .to eq 'SMTP; 550 5.1.1    mailbox does not exist'
+        expect(bob['x-example-extension']).to eq 'extension-value'
+      end
+
+      it "reports retryable and bounced results per recipient" do
+        alice, bob = part.recipient_reports
+
+        expect(alice.final_recipient).to eq 'RFC822; alice@example.com'
+        expect(alice).to be_retryable
+        expect(alice).not_to be_bounced
+
+        expect(bob.final_recipient).to eq 'RFC822; bob@example.com'
+        expect(bob).not_to be_retryable
+        expect(bob).to be_bounced
+      end
+
+      it "keeps aggregating the whole part as both retryable and bounced" do
+        # A mixed notification still has a retryable recipient and a
+        # permanent failure.
+        expect(part).to be_retryable
+        expect(part).to be_bounced
+      end
+
+      it "does not change per-recipient conclusions when blocks are swapped" do
+        swapped = build_part([bob_block, alice_block])
+
+        conclusions = lambda do |mail|
+          mail.recipient_reports.map do |record|
+            [record.final_recipient, record.action, record.status,
+             record.retryable?, record.bounced?]
+          end.sort_by(&:first)
+        end
+
+        expect(conclusions.call(swapped)).to eq conclusions.call(part)
+        expect(swapped.diagnostic_code)
+          .to eq ['SMTP; 550 5.1.1    mailbox does not exist', nil]
+      end
+    end
   end
 
   it "should correctly parse plain text raw source and not truncate after newlines - issue 208" do

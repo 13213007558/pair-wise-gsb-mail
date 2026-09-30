@@ -562,6 +562,33 @@ Results in the same email as done using the block form
 @mail.retryable?       #=> false
 ```
 
+A delivery status notification contains a per-message group followed by one
+group per recipient. When a notification covers more than one recipient, the
+single-recipient accessors return Arrays in recipient order, with `nil` for
+optional fields a recipient omits (so values stay aligned without relying on
+array indexes). For reliable per-recipient results iterate over
+`recipient_reports`:
+
+```ruby
+@mail.recipient_reports.each do |report|
+  report.final_recipient  #=> "rfc822;mikel@dont.exist.com"
+  report.action           #=> "failed" or "delayed"
+  report.status           #=> "5.5.0" (also available as report.error_status)
+  report.diagnostic_code  #=> smtp;550 ... or nil when omitted
+  report.remote_mta       #=> dns;mx.example.com
+  report.bounced?         #=> true for a permanent failure (5.x / "failed")
+  report.retryable?       #=> true for a transient 4.x status, false otherwise
+  report['x-extension']   #=> unknown extension fields are readable
+end
+```
+
+Aggregate rules for the whole notification: `bounced?` is true when at least
+one recipient permanently failed; `retryable?` is true when at least one
+recipient still has a transient 4.x status, false when all known statuses are
+permanent, and nil when there is no usable status. Report-level fields (such
+as `Reporting-MTA`) are available through
+`@mail.delivery_status_report['reporting-mta']`.
+
 ### Attaching and Detaching Files
 
 You can just read the file off an absolute path, Mail will try

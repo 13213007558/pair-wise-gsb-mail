@@ -1,6 +1,7 @@
 # encoding: utf-8
 # frozen_string_literal: true
 require 'mail/constants'
+require 'mail/delivery_status_report'
 require 'mail/utilities'
 
 module Mail
@@ -47,21 +48,35 @@ module Mail
       (main_type =~ /message/i && sub_type =~ /delivery-status/i) && body =~ /Status:/
     end
 
+    # Returns the parsed Mail::DeliveryStatusReport, which keeps the per-message
+    # fields separate from the per-recipient records. See
+    # Mail::DeliveryStatusReport#recipient_reports for per-recipient results.
     def delivery_status_data
       delivery_status_report_part? ? parse_delivery_status_report : {}
     end
 
-    def bounced?
-      if action.is_a?(Array)
-        !!(action.first =~ /failed/i)
+    def delivery_status_report
+      delivery_status_report_part? ? parse_delivery_status_report : nil
+    end
+
+    def recipient_reports
+      if report = delivery_status_report
+        report.recipient_reports
       else
-        !!(action =~ /failed/i)
+        []
       end
     end
 
+    # True when at least one recipient record reports a permanent failure.
+    def bounced?
+      delivery_status_report ? delivery_status_report.bounced? : false
+    end
 
     # Either returns the action if the message has just a single report, or an
-    # array of all the actions, one for each report
+    # array of all the actions, one for each report. The single-recipient
+    # readers return a String for one recipient and a nil padded Array for
+    # multiple recipients, so omitted optional fields stay aligned. Use
+    # #recipient_reports for reliable per-recipient pairing.
     def action
       get_return_values('action')
     end
@@ -83,19 +98,15 @@ module Mail
     end
 
     def retryable?
-      !(error_status =~ /^5/)
+      delivery_status_report ? delivery_status_report.retryable? : nil
     end
 
     private
 
     def get_return_values(key)
-      if delivery_status_data[key].is_a?(Array)
-        delivery_status_data[key].map { |a| a.value }
-      elsif !delivery_status_data[key].nil?
-        delivery_status_data[key].value
-      else
-        nil
-      end
+      return nil unless delivery_status_report
+
+      delivery_status_report.values(key)
     end
 
     # A part may not have a header.... so, just init a body if no header
@@ -111,7 +122,7 @@ module Mail
     end
 
     def parse_delivery_status_report
-      @delivery_status_data ||= Header.new(body.to_s.gsub("\r\n\r\n", "\r\n"))
+      @delivery_status_data ||= DeliveryStatusReport.new(body)
     end
 
   end

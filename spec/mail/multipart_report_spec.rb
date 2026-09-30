@@ -123,7 +123,82 @@ RSpec.describe "multipart/report emails" do
       end
     end
 
+    describe "multiple recipients with different optional fields" do
+      let(:alice_block) do
+        <<ENDPART
+Final-Recipient: RFC822; alice@example.com
+Action: delayed
+Status: 4.2.2
+Remote-MTA: DNS; mx.example.com
+ENDPART
+      end
+
+      let(:bob_block) do
+        <<ENDPART
+Final-Recipient: RFC822; bob@example.com
+Action: failed
+Status: 5.1.1
+Remote-MTA: DNS; mx.example.com
+Diagnostic-Code: SMTP; 550 5.1.1 mailbox does not exist
+ENDPART
+      end
+
+      let(:report_block) do
+        <<ENDPART
+Reporting-MTA: dns; mail.example.com
+Arrival-Date: Mon, 24 Dec 2007 10:03:47 +1100
+ENDPART
+      end
+
+      def build_mail(recipient_blocks)
+        status_body = report_block + "\n" + recipient_blocks.join("\n")
+        Mail.new(Mail::Utilities.to_crlf(<<ENDCONTENT))
+Content-Type: multipart/report; report-type=delivery-status;
+ boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+delivery status notification
+--boundary
+Content-Type: message/delivery-status
+
+#{status_body}--boundary--
+ENDCONTENT
+      end
+
+      it "pairs optional fields per recipient and aggregates the mail" do
+        mail = build_mail([alice_block, bob_block])
+
+        expect(mail).to be_delivery_status_report
+        expect(mail.final_recipient)
+          .to eq ['RFC822; alice@example.com', 'RFC822; bob@example.com']
+        expect(mail.error_status).to eq ['4.2.2', '5.1.1']
+        expect(mail.diagnostic_code)
+          .to eq [nil, 'SMTP; 550 5.1.1 mailbox does not exist']
+        expect(mail).to be_retryable
+        expect(mail).to be_bounced
+
+        alice, bob = mail.recipient_reports
+        expect([alice.retryable?, alice.bounced?]).to eq [true, false]
+        expect([bob.retryable?, bob.bounced?]).to eq [false, true]
+      end
+
+      it "keeps the same per-recipient results when the blocks are swapped" do
+        mail = build_mail([alice_block, bob_block])
+        swapped = build_mail([bob_block, alice_block])
+
+        conclusions = lambda do |m|
+          m.recipient_reports.map do |record|
+            [record.final_recipient, record.status,
+             record.diagnostic_code, record.retryable?, record.bounced?]
+          end.sort_by(&:first)
+        end
+
+        expect(conclusions.call(swapped)).to eq conclusions.call(mail)
+      end
+    end
+
   end
 
 end
-

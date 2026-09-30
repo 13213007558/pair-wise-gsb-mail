@@ -1558,8 +1558,22 @@ module Mail
       @delivery_status_part
     end
 
+    # Parsed message/delivery-status part as a Mail::DeliveryStatusReport,
+    # or nil when the message is not a delivery status notification.
+    def delivery_status_report
+      delivery_status_part and delivery_status_part.delivery_status_report
+    end
+
     def bounced?
       delivery_status_part and delivery_status_part.bounced?
+    end
+
+    # Per-recipient DSN records. Each entry is a
+    # Mail::DeliveryStatusReport::RecipientReport and responds to
+    # final_recipient, action, status (aliased as error_status),
+    # diagnostic_code, remote_mta, bounced? and retryable?.
+    def recipient_reports
+      delivery_status_part ? delivery_status_part.recipient_reports : []
     end
 
     def action
@@ -1582,6 +1596,9 @@ module Mail
       delivery_status_part and delivery_status_part.remote_mta
     end
 
+    # True when delivery may still succeed for any recipient (a transient 4.x
+    # status); false when every known recipient status is non retryable
+    # (a permanent 5.x status); nil when there is no usable status.
     def retryable?
       delivery_status_part and delivery_status_part.retryable?
     end
