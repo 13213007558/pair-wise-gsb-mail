@@ -562,6 +562,29 @@ Results in the same email as done using the block form
 @mail.retryable?       #=> false
 ```
 
+For reports about more than one recipient, the delivery status part keeps
+one record per recipient, so fields stay paired even when a recipient omits
+an optional field such as Diagnostic-Code:
+
+```ruby
+status = @mail.delivery_status_part.delivery_status_data
+status['reporting-mta']  #=> report-level (per-message) fields
+status.recipients.each do |recipient|
+  recipient.final_recipient  #=> rfc822;mikel@dont.exist.com
+  recipient.status           #=> 5.5.0
+  recipient.diagnostic_code  #=> nil when this recipient has none
+  recipient.bounced?         #=> true when Action is "failed"
+  recipient.retryable?       #=> false when Status starts with 5
+end
+```
+
+Whole-message aggregation rules: `bounced?` is true when at least one
+recipient's Action is "failed"; `retryable?` is true when at least one
+recipient did not permanently fail (Status does not start with 5). The
+single-value accessors (`action`, `final_recipient`, `error_status`,
+`diagnostic_code`, `remote_mta`) return arrays aligned by recipient when
+the report covers more than one recipient.
+
 ### Attaching and Detaching Files
 
 You can just read the file off an absolute path, Mail will try

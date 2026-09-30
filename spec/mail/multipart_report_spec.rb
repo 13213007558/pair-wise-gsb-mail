@@ -88,6 +88,64 @@ RSpec.describe "multipart/report emails" do
       end
     end
 
+    describe "multipart report with mixed per-recipient results" do
+
+      let(:mail) { read_fixture('emails', 'multipart_report_emails', 'multi_address_mixed_results.eml') }
+      let(:delivery_status) { mail.delivery_status_part.delivery_status_data }
+
+      def recipient_conclusions(message)
+        message.delivery_status_part.delivery_status_data.recipients.map do |recipient|
+          [recipient.final_recipient, recipient.action, recipient.status,
+           recipient.diagnostic_code, recipient.retryable?, recipient.bounced?]
+        end.sort_by(&:first)
+      end
+
+      it "keeps report-level fields separate from the recipient records" do
+        expect(delivery_status['reporting-mta']).to eq 'dns; mail.example.com'
+        expect(delivery_status['x-postfix-queue-id']).to eq 'MIXED001'
+        expect(delivery_status.recipients.length).to eq 2
+      end
+
+      it "keeps per-recipient fields paired when an optional field is missing" do
+        delayed, failed = delivery_status.recipients
+        expect(delayed.final_recipient).to eq 'rfc822; delayed@example.com'
+        expect(delayed.status).to eq '4.4.1'
+        expect(delayed.diagnostic_code).to be_nil
+        expect(failed.final_recipient).to eq 'rfc822; failed@example.com'
+        expect(failed.status).to eq '5.1.1'
+        expect(failed.diagnostic_code).to eq "smtp; 550 5.1.1 <failed@example.com>... User unknown,\tmailbox does not exist"
+      end
+
+      it "gives per-recipient retry and failure results" do
+        delayed, failed = delivery_status.recipients
+        expect(delayed).to be_retryable
+        expect(delayed).not_to be_bounced
+        expect(failed).not_to be_retryable
+        expect(failed).to be_bounced
+      end
+
+      it "aggregates the whole message across recipients" do
+        expect(mail).to be_bounced
+        expect(mail).to be_retryable
+      end
+
+      it "keeps the legacy array accessors aligned by recipient" do
+        expect(mail.action).to eq ['delayed', 'failed']
+        expect(mail.error_status).to eq ['4.4.1', '5.1.1']
+        expect(mail.final_recipient).to eq ['rfc822; delayed@example.com', 'rfc822; failed@example.com']
+        expect(mail.diagnostic_code).to eq [nil, "smtp; 550 5.1.1 <failed@example.com>... User unknown,\tmailbox does not exist"]
+      end
+
+      it "does not change per-recipient conclusions when the blocks are swapped" do
+        raw = read_raw_fixture('emails', 'multipart_report_emails', 'multi_address_mixed_results.eml')
+        swapped = raw.sub(/(Final-Recipient: rfc822; delayed@example\.com.*?)\n\n(Final-Recipient: rfc822; failed@example\.com.*?)(\n\n--)/m) do
+          "#{$2}\n\n#{$1}#{$3}"
+        end
+        swapped_mail = Mail.read_from_string(swapped)
+        expect(recipient_conclusions(swapped_mail)).to eq recipient_conclusions(mail)
+      end
+    end
+
     describe "permanent failure" do
 
       before(:each) do
@@ -126,4 +184,3 @@ RSpec.describe "multipart/report emails" do
   end
 
 end
-
