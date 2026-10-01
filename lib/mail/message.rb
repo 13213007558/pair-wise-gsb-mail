@@ -1638,6 +1638,23 @@ module Mail
       !attachments.empty?
     end
 
+    # Returns a Mail::RelatedResources resolver for this message. It resolves
+    # cid: URLs and relative Content-Location references found in HTML parts
+    # against the correct multipart/related container, honouring the scoping
+    # of message/rfc822 parts and nested multipart/related containers.
+    def related_resources
+      RelatedResources.new(self)
+    end
+
+    # Resolve a single resource reference (for example "cid:logo@example" or
+    # "images/logo.png") found in the HTML part given by +from+ (defaults to
+    # the message's html part). Returns a Mail::RelatedResources::Result that
+    # is either found, ambiguous, not_found or not_applicable; it never
+    # accesses the network.
+    def resolve_related_resource(reference, from: nil)
+      related_resources.resolve(reference, :from => from)
+    end
+
     # Accessor for html_part
     def html_part(&block)
       if block_given?

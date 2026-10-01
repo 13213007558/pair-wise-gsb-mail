@@ -9,6 +9,7 @@ Compatibility:
 
 Features:
 
+* Add Mail::RelatedResources (Message#related_resources / Message#resolve_related_resource) to resolve cid: URLs and relative Content-Location references from HTML parts against the correct multipart/related container, honouring start/type root selection and message/rfc822 / nested multipart/related scoping, with found / ambiguous / not_found / not_applicable results and no network access
 * Updated README to improve around sending multipart mail @kapfenho
 * Add delivery_interceptors method to Mail class to fetch registered interceptors @ghousemohamed
 

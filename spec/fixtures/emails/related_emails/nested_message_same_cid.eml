@@ -1,0 +1,55 @@
+From: outer@example.com
+To: recipient@example.com
+Subject: Outer message embedding a forwarded message that reuses the same CID
+Date: Thu, 01 Oct 2026 10:00:00 +0000
+Message-Id: <outer-message@example.com>
+Mime-Version: 1.0
+Content-Type: multipart/related;
+ boundary="outer-related-boundary";
+ type="text/html";
+ start="<outer-html@example.com>"
+
+--outer-related-boundary
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Id: <outer-html@example.com>
+
+<html><body><p>Outer HTML</p><img src="cid:logo"></body></html>
+--outer-related-boundary
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-Id: <logo>
+Content-Location: images/logo.png
+Content-Disposition: inline; filename=logo.png
+
+T1VURVItTE9HTy1JTUFHRQ==
+--outer-related-boundary
+Content-Type: message/rfc822
+Content-Disposition: attachment; filename=forwarded.eml
+
+From: inner@example.com
+To: recipient@example.com
+Subject: Inner message using the same CID as its parent
+Date: Thu, 01 Oct 2026 09:00:00 +0000
+Message-Id: <inner-message@example.com>
+Mime-Version: 1.0
+Content-Type: multipart/related;
+ boundary="inner-related-boundary";
+ type="text/html";
+ start="<inner-html@example.com>"
+
+--inner-related-boundary
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Id: <inner-html@example.com>
+
+<html><body><p>Inner HTML</p><img src="cid:logo"></body></html>
+--inner-related-boundary
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-Id: <logo>
+Content-Disposition: inline; filename=logo.png
+
+SU5ORVItTE9HTy1JTUFHRQ==
+--inner-related-boundary--
+--outer-related-boundary--

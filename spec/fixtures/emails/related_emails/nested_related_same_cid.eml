@@ -1,0 +1,45 @@
+From: outer@example.com
+To: recipient@example.com
+Subject: Outer related container embedding a nested related container with the same CID
+Date: Thu, 01 Oct 2026 10:00:00 +0000
+Message-Id: <outer-related@example.com>
+Mime-Version: 1.0
+Content-Type: multipart/related;
+ boundary="outer-related-boundary";
+ type="text/html";
+ start="<outer-html@example.com>"
+
+--outer-related-boundary
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Id: <outer-html@example.com>
+
+<html><body><p>Outer HTML</p><img src="cid:logo"></body></html>
+--outer-related-boundary
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-Id: <logo>
+Content-Disposition: inline; filename=logo.png
+
+T1VURVItTE9HTy1JTUFHRQ==
+--outer-related-boundary
+Content-Type: multipart/related;
+ boundary="nested-related-boundary";
+ type="text/html";
+ start="<nested-html@example.com>"
+
+--nested-related-boundary
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Id: <nested-html@example.com>
+
+<html><body><p>Nested HTML</p><img src="cid:logo"></body></html>
+--nested-related-boundary
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-Id: <logo>
+Content-Disposition: inline; filename=logo.png
+
+TkVTVEVELUxPR08tSU1BR0U=
+--nested-related-boundary--
+--outer-related-boundary--
