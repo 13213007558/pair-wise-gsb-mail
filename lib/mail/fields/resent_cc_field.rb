@@ -11,7 +11,8 @@ module Mail
   # has a ResentCcField as its field type.  This includes all Mail::CommonAddress
   # module instance metods.
   #
-  # Only one Resent-Cc field can appear in a header, though it can have multiple
+  # Exactly one Resent-Cc field appears per resent block (RFC 5322 3.6.6);
+  # a header may carry one per resending event, and it can have multiple
   # addresses and groups of addresses.
   #
   # == Examples:
@@ -29,5 +30,11 @@ module Mail
   #  mail[:resent_cc].formatted #=> ['Mikel Lindsaar <mikel@test.lindsaar.net>', 'ada@test.lindsaar.net']
   class ResentCcField < CommonAddressField #:nodoc:
     NAME = 'Resent-Cc'
+
+    # RFC 5322 3.6.6: one Resent-Cc per resent block; multiple blocks
+    # may be present, so the field is not singular across a header.
+    def self.singular?
+      false
+    end
   end
 end

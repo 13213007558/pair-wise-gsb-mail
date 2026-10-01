@@ -106,6 +106,111 @@ module Mail
       @fields.map(&:errors).flatten(1)
     end
 
+    # All Resent-* fields in the header, in the order they appear.  RFC
+    # 5322 3.6.6 states that resent fields must not be reordered and that
+    # each set represents a separate resending event.
+    def resent_fields
+      fields.resent_fields
+    end
+
+    # Returns the resent blocks (Mail::ResentBlock instances) present in
+    # the header, ordered from oldest to newest as they appear.
+    def resent_blocks
+      Mail::ResentBlock.from_fields(resent_fields)
+    end
+
+    # Appends a complete Mail::ResentBlock (or an equivalent hash of
+    # attributes) as a new batch without touching any existing resent
+    # fields.  Returns the appended block.
+    def append_resent_block(block = nil, **attributes)
+      block = build_resent_block(block, attributes)
+      block.to_fields(charset).each { |field| fields.add_field field }
+      block
+    end
+
+    # Removes all fields belonging to one resent block.
+    #
+    # Accepts a Mail::ResentBlock, its index among #resent_blocks, or a
+    # block matched against each resent block.  Other resent blocks and
+    # their field order are preserved.  Returns the removed block, or nil
+    # if nothing matched.
+    def remove_resent_block(target = nil, &matcher)
+      blocks = resent_blocks
+      index = resolve_resent_block_index(blocks, target, &matcher)
+      return nil if index.nil?
+
+      block = blocks[index]
+      block.fields.each do |field|
+        @fields.delete_if { |f| f.equal?(field) }
+      end
+      block
+    end
+
+    # Returns the most recent (last) complete resent block, or nil if the
+    # header has no resent fields.
+    def latest_resent_block
+      resent_blocks.last
+    end
+
+    # Removes only the Resent-Bcc field(s) belonging to one resent block,
+    # leaving the rest of the block and every other block untouched.
+    def remove_resent_bcc(target = :latest)
+      index =
+        case target
+        when :latest
+          resent_blocks.size - 1
+        when Integer
+          target
+        else
+          resolve_resent_block_index(resent_blocks, target)
+        end
+      block = resent_blocks[index]
+      return nil unless block
+
+      block.fields.select { |f| f.responsible_for?('Resent-Bcc') }.each do |field|
+        @fields.delete_if { |f| f.equal?(field) }
+      end
+      block
+    end
+
+    private
+
+    def resolve_resent_block_index(blocks, target, &matcher)
+      index =
+        case target
+        when Integer
+          target
+        when nil
+          blocks.index(&matcher)
+        else
+          blocks.index(target)
+        end
+      return nil if index.nil? || index < 0 || index >= blocks.size
+
+      index
+    end
+
+    def build_resent_block(block, attributes)
+      case block
+      when Mail::ResentBlock
+        block
+      when nil
+        Mail::ResentBlock.new(**attributes)
+      when Hash
+        Mail::ResentBlock.new(**symbolize_keys(block))
+      else
+        raise ArgumentError, "expected a Mail::ResentBlock or attributes Hash, got #{block.inspect}"
+      end
+    end
+
+    def symbolize_keys(hash)
+      hash.each_with_object({}) do |(key, value), result|
+        result[key.to_sym] = value
+      end
+    end
+
+    public
+
     #  3.6. Field definitions
     #
     #   The following table indicates limits on the number of times each

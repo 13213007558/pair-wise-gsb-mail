@@ -6,6 +6,12 @@ module Mail
   # email fields in order.  And allows you to insert new fields without
   # having to worry about the order they will appear in.
   class FieldList < Array
+    # RFC 5322 3.6.6: each set of resent fields corresponds to a separate
+    # resending event and MUST NOT be reordered. Unlike every other
+    # structured field, Resent-* fields may therefore occur more than once
+    # and must keep the order in which they were read.
+    RESENT_FIELD_PREFIX = 'resent-'
+
     def has_field?(field_name)
       any? { |f| f.responsible_for? field_name }
     end
@@ -39,22 +45,14 @@ module Mail
 
     # Insert the field in sorted order.
     #
-    # Heavily based on bisect.insort from Python, which is:
-    #   Copyright (C) 2001-2013 Python Software Foundation.
-    #   Licensed under <http://docs.python.org/license.html>
-    #   From <http://hg.python.org/cpython/file/2.7/Lib/bisect.py>
+    # Resent fields are inserted immediately after the existing resent
+    # fields (immediately before the first non-resent field if no resent
+    # fields exist yet) so independent resent batches keep the order in
+    # which they were read instead of being grouped by field name.
     def insert_field(field)
-      lo, hi = 0, size
-      while lo < hi
-        mid = (lo + hi).div(2)
-        if field < self[mid]
-          hi = mid
-        else
-          lo = mid + 1
-        end
-      end
+      return insert_resent_field(field) if resent_field?(field.name)
 
-      insert lo, field
+      insert(index { |f| field < f } || size, field)
     end
 
     def delete_field(name)
@@ -65,7 +63,27 @@ module Mail
       map { |f| "<#{f.name}: #{f.value}>" }.join(", ")
     end
 
+    # Returns all Resent-* fields in the order they appear in the header.
+    def resent_fields
+      select { |f| resent_field?(f.name) }
+    end
+
     private
+
+    def resent_field?(field_name)
+      field_name.to_s.downcase.start_with?(RESENT_FIELD_PREFIX)
+    end
+
+    # Append a new resent field immediately after the existing resent
+    # fields. If no resent fields exist yet, insert it directly before the
+    # original message headers, keeping the resent block prepended.
+    def insert_resent_field(field)
+      if (last_resent = rindex { |f| resent_field?(f.name) })
+        insert(last_resent + 1, field)
+      else
+        insert(index { |f| field < f } || size, field)
+      end
+    end
 
     def select_fields(field_name)
       fields = select { |f| f.responsible_for? field_name }

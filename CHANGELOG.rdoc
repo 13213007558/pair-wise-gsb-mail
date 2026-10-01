@@ -11,6 +11,12 @@ Features:
 
 * Updated README to improve around sending multipart mail @kapfenho
 * Add delivery_interceptors method to Mail class to fetch registered interceptors @ghousemohamed
+* Support multiple independent Resent-* batches per RFC 5322 3.6.6:
+  Resent-* fields are no longer treated as singular and keep their source
+  order; add Mail::ResentBlock plus Mail::Message#resent_blocks,
+  #append_resent_block, #remove_resent_block, #latest_resent_block,
+  #resent_envelope and #resent_delivery_copy (strips the batch's own
+  Resent-Bcc from the delivered copy while the original stays audit-ready)
 
 Code Improvements:
 

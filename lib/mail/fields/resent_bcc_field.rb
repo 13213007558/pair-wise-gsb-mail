@@ -11,7 +11,8 @@ module Mail
   # has a ResentBccField as its field type.  This includes all Mail::CommonAddress
   # module instance metods.
   #
-  # Only one Resent-Bcc field can appear in a header, though it can have multiple
+  # Exactly one Resent-Bcc field appears per resent block (RFC 5322 3.6.6);
+  # a header may carry one per resending event, and it can have multiple
   # addresses and groups of addresses.
   #
   # == Examples:
@@ -29,5 +30,11 @@ module Mail
   #  mail[:resent_bcc].formatted #=> ['Mikel Lindsaar <mikel@test.lindsaar.net>', 'ada@test.lindsaar.net']
   class ResentBccField < CommonAddressField #:nodoc:
     NAME = 'Resent-Bcc'
+
+    # RFC 5322 3.6.6: one Resent-Bcc per resent block; multiple blocks
+    # may be present, so the field is not singular across a header.
+    def self.singular?
+      false
+    end
   end
 end

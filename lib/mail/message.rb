@@ -834,7 +834,11 @@ module Mail
     #  mail.resent_bcc << 'ada@test.lindsaar.net'
     #  mail.resent_bcc #=> ['mikel@test.lindsaar.net', 'ada@test.lindsaar.net']
     def resent_bcc( val = nil )
-      default :resent_bcc, val
+      if val
+        header[:resent_bcc] = val
+      else
+        value_of_latest_resent_block(:bcc)
+      end
     end
 
     # Sets the Resent-Bcc value of the mail object, pass in a string of the field
@@ -875,7 +879,11 @@ module Mail
     #  mail.resent_cc << 'ada@test.lindsaar.net'
     #  mail.resent_cc #=> ['mikel@test.lindsaar.net', 'ada@test.lindsaar.net']
     def resent_cc( val = nil )
-      default :resent_cc, val
+      if val
+        header[:resent_cc] = val
+      else
+        value_of_latest_resent_block(:cc)
+      end
     end
 
     # Sets the Resent-Cc value of the mail object, pass in a string of the field
@@ -891,7 +899,11 @@ module Mail
     end
 
     def resent_date( val = nil )
-      default :resent_date, val
+      if val
+        header[:resent_date] = val
+      else
+        latest_resent_block&.date
+      end
     end
 
     def resent_date=( val )
@@ -924,7 +936,11 @@ module Mail
     #  mail.resent_from << 'ada@test.lindsaar.net'
     #  mail.resent_from #=> ['mikel@test.lindsaar.net', 'ada@test.lindsaar.net']
     def resent_from( val = nil )
-      default :resent_from, val
+      if val
+        header[:resent_from] = val
+      else
+        value_of_latest_resent_block(:from)
+      end
     end
 
     # Sets the Resent-From value of the mail object, pass in a string of the field
@@ -940,7 +956,11 @@ module Mail
     end
 
     def resent_message_id( val = nil )
-      default :resent_message_id, val
+      if val
+        header[:resent_message_id] = val
+      else
+        latest_resent_block&.message_id
+      end
     end
 
     def resent_message_id=( val )
@@ -963,7 +983,11 @@ module Mail
     #  mail.resent_sender 'Mikel <mikel@test.lindsaar.net>'
     #  mail.resent_sender #=> 'mikel@test.lindsaar.net'
     def resent_sender( val = nil )
-      default :resent_sender, val
+      if val
+        header[:resent_sender] = val
+      else
+        value_of_latest_resent_block(:sender)
+      end
     end
 
     # Sets the Resent-Sender value of the mail object, pass in a string of the field
@@ -1002,7 +1026,11 @@ module Mail
     #  mail.resent_to << 'ada@test.lindsaar.net'
     #  mail.resent_to #=> ['mikel@test.lindsaar.net', 'ada@test.lindsaar.net']
     def resent_to( val = nil )
-      default :resent_to, val
+      if val
+        header[:resent_to] = val
+      else
+        value_of_latest_resent_block(:to)
+      end
     end
 
     # Sets the Resent-To value of the mail object, pass in a string of the field
@@ -1015,6 +1043,94 @@ module Mail
     #  mail.resent_to #=> ['mikel@test.lindsaar.net', 'ada@test.lindsaar.net']
     def resent_to=( val )
       header[:resent_to] = val
+    end
+
+    # Returns all independent resent batches as Mail::ResentBlock objects,
+    # in header order.  Each group of Resent-* fields corresponds to one
+    # resending event (RFC 5322 3.6.6).
+    #
+    # Example:
+    #
+    #  mail.resent_blocks       #=> [#<Mail::ResentBlock ...>, #<Mail::ResentBlock ...>]
+    def resent_blocks
+      header.resent_blocks
+    end
+
+    # Returns the most recent complete resent block, or nil if the message
+    # has never been resent.
+    #
+    # Example:
+    #
+    #  mail.latest_resent_block #=> #<Mail::ResentBlock from=["alice@example.com"] ...>
+    def latest_resent_block
+      header.latest_resent_block
+    end
+
+    # Appends a new, independent resent batch to the message without
+    # touching the fields of earlier batches.
+    #
+    # Accepts a Mail::ResentBlock or attribute keywords (+from+, +to+,
+    # +cc+, +bcc+, +sender+, +date+, +message_id+).  The block is validated
+    # (required Resent-Date/Resent-From/recipient fields, Resent-Sender when
+    # Resent-From has multiple authors) before anything is written.
+    #
+    # Example:
+    #
+    #  block = mail.append_resent_block(from: 'alice@example.com',
+    #                                   to:   'bob@example.com')
+    def append_resent_block(block = nil, **attributes)
+      header.append_resent_block(block, **attributes)
+    end
+
+    # Removes the fields of one resent batch, preserving the field order of
+    # every other batch.  Accepts a Mail::ResentBlock, a block index or a
+    # block used to find the batch.  Returns the removed block or nil.
+    #
+    # Example:
+    #
+    #  mail.remove_resent_block(0)
+    #  mail.remove_resent_block { |b| b.from.include?('alice@example.com') }
+    def remove_resent_block(target = nil, &matcher)
+      header.remove_resent_block(target, &matcher)
+    end
+
+    # Validates every resent batch in the message.  Each batch must have
+    # Resent-Date, Resent-From and at least one recipient, and a
+    # Resent-Sender whenever Resent-From lists multiple authors.
+    #
+    # Returns true, or raises Mail::ResentBlock::ValidationError.
+    def validate_resent_blocks!
+      resent_blocks.each(&:validate!)
+      true
+    end
+
+    # Builds the delivery envelope (Mail::SmtpEnvelope) from the most
+    # recent complete resent batch, per RFC 5322 3.6.6:
+    #
+    # * envelope from is Resent-Sender, else the first Resent-From address
+    # * envelope to is Resent-To + Resent-Cc + Resent-Bcc
+    # * the message is #resent_delivery_copy, with the batch's own
+    #   Resent-Bcc stripped
+    #
+    # Raises Mail::ResentBlock::ValidationError if the batch does not
+    # contain the required fields.
+    def resent_envelope
+      block = latest_resent_block
+      raise Mail::ResentBlock::ValidationError, 'message has no resent block' unless block
+
+      block.validate!
+      Mail::SmtpEnvelope.for_resent_block(self, block)
+    end
+
+    # Returns a copy of the message ready to hand to a delivery agent for
+    # the given resent batch (defaults to the most recent one): the copy's
+    # matching Resent-Bcc field is removed, as Bcc recipients must not be
+    # disclosed.  The original message is left untouched and remains
+    # available for auditing.
+    def resent_delivery_copy(target = :latest)
+      copy = dup
+      copy.header.remove_resent_bcc(target)
+      copy
     end
 
     # Returns the return path of the mail object, or sets it if you pass a string
@@ -1215,6 +1331,15 @@ module Mail
         field.default
       end
     end
+
+    # Resent-* accessors read off the most recent complete resent batch;
+    # return nil for empty address lists so absent fields stay absent.
+    def value_of_latest_resent_block(attribute)
+      block = latest_resent_block or return nil
+      value = block.send(attribute)
+      value.nil? || (value.respond_to?(:empty?) && value.empty?) ? nil : value
+    end
+    private :value_of_latest_resent_block
 
     # Sets the body object of the message object.
     #

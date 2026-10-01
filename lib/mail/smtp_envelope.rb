@@ -8,10 +8,26 @@ module Mail
 
     attr_reader :from, :to, :message
 
-    def initialize(mail)
-      self.from = mail.smtp_envelope_from
-      self.to = mail.smtp_envelope_to
-      self.message = mail.encoded
+    # Build the SMTP envelope for delivering a resent message from one
+    # complete resent batch (RFC 5322 3.6.6).  The envelope sender is the
+    # batch Resent-Sender, or the first Resent-From address; recipients are
+    # Resent-To + Resent-Cc + Resent-Bcc.  The delivered message is a copy
+    # with the batch's own Resent-Bcc stripped.
+    def self.for_resent_block(mail, block)
+      from = block.sender_address || block.from.first
+      new.tap do |envelope|
+        envelope.from = from
+        envelope.to = block.recipients
+        envelope.message = mail.resent_delivery_copy(block).encoded
+      end
+    end
+
+    def initialize(mail = nil)
+      if mail
+        self.from = mail.smtp_envelope_from
+        self.to = mail.smtp_envelope_to
+        self.message = mail.encoded
+      end
     end
 
     def from=(addr)
