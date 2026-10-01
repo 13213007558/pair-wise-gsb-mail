@@ -27,7 +27,8 @@ module Mail
 
     STRUCTURED_FIELDS = %w[ bcc cc content-description content-disposition
                             content-id content-location content-transfer-encoding
-                            content-type date from in-reply-to keywords message-id
+                            content-type date dkim-signature from in-reply-to
+                            keywords message-id
                             mime-version received references reply-to
                             resent-bcc resent-cc resent-date resent-from
                             resent-message-id resent-sender resent-to
@@ -65,6 +66,7 @@ module Mail
       "content-type" => "ContentTypeField",
       "content-id" => "ContentIdField",
       "content-location" => "ContentLocationField",
+      "dkim-signature" => "DkimSignatureField",
     }
 
     FIELD_NAME_MAP = {
@@ -97,6 +99,7 @@ module Mail
       "content-type" => "Content-Type",
       "content-id" => "Content-ID",
       "content-location" => "Content-Location",
+      "dkim-signature" => "DKIM-Signature",
     }
 
     # Generic Field Exception

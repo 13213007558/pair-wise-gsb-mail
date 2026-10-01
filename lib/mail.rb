@@ -60,6 +60,9 @@ module Mail # :doc:
   require 'mail/matchers/has_sent_mail'
   require 'mail/matchers/attachment_matchers'
 
+  # RFC 6376 DKIM signing/verification (loaded lazily through Mail::DKIM).
+  register_autoload :DKIM, 'mail/dkim'
+
   # Finally... require all the Mail.methods
   require 'mail/mail'
 end

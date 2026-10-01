@@ -305,6 +305,69 @@ mail.delivery_method :logger
 mail.delivery_method :logger, logger: other_logger, severity: :debug
 ```
 
+### Signing with DKIM
+
+Mail can sign and verify messages with DomainKeys Identified Mail
+(RFC 6376) in-process using RSA-SHA256. No external command is needed:
+keys and DNS TXT answers are injected by your code.
+
+```ruby
+private_key = File.read('dkim.pem')
+
+mail = Mail.new do
+  from    'alice@example.com'
+  to      'bob@example.org'
+  subject 'Signed message'
+  body    'Hello'
+end
+
+mail.dkim_sign!(domain: 'example.com', selector: 'mail',
+                private_key: private_key,
+                canonicalization: 'relaxed/relaxed') # the default
+
+# #encoded now returns exactly the signed bytes, so delivery sends the
+# DKIM-Signature unchanged.
+mail.deliver!
+```
+
+You can also work directly with raw message bytes:
+
+```ruby
+signed = Mail::DKIM.sign(raw_message, domain: 'example.com',
+                         selector: 'mail', private_key: private_key,
+                         headers: %w[From To Subject], # optional h=
+                         length: 1234)                  # optional l=
+```
+
+### Verifying DKIM signatures
+
+Verification is performed against the exact received bytes. A message can
+carry several signatures; each one is evaluated independently, so one
+failing signature never removes another signature's result.
+
+```ruby
+# Resolver answers "#{selector}._domainkey.#{domain}" with the TXT record.
+# A Hash (offline/tests), a Proc/lambda or Mail::DKIM::Resolver::ResolvDns
+# (stdlib Resolv) can be injected.
+resolver = { 'mail._domainkey.example.com' => 'v=DKIM1; p=MIGfMA0...' }
+
+results = Mail::DKIM.verify(received_raw_bytes, resolver: resolver)
+results.pass?            # true if any signature verified
+results.size             # one result per DKIM-Signature found
+results.each do |result|
+  puts "#{result.status} d=#{result.domain} s=#{result.selector}"
+  puts "  #{result.reason}" unless result.pass?
+end
+
+# Or on a parsed message (uses its untouched raw source when present):
+Mail.new(received_raw_bytes).dkim_verify(resolver: resolver)
+```
+
+Both the simple and relaxed canonicalizations are supported for headers
+and body, duplicate header instances are selected from the bottom of the
+header block upwards as required, and the `l=` body length tag is handled
+(body bytes after the signed length do not invalidate a signature).
+
 ### Getting Emails from a POP or IMAP Server:
 
 You can configure Mail to receive email using <code>retriever_method</code>

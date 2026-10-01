@@ -1807,12 +1807,58 @@ module Mail
     # Outputs an encoded string representation of the mail message including
     # all headers, attachments, etc.  This is an encoded email in US-ASCII,
     # so it is able to be directly sent to an email server.
+    #
+    # Once #dkim_sign! has been called this returns the exact bytes that
+    # were signed (including the folded DKIM-Signature), so delivery
+    # methods transmit the signature unchanged.
     def encoded
+      return @dkim_signed_source if @dkim_signed_source
       ready_to_send!
       buffer = header.encoded
       buffer << "\r\n"
       buffer << body.encoded(content_transfer_encoding)
       buffer
+    end
+
+    # Sign the message in-process with DKIM (RFC 6376, rsa-sha256).
+    # Returns self; the signed bytes are subsequently returned by
+    # #encoded and therefore sent unchanged by every delivery method.
+    #
+    #   mail.dkim_sign!(domain: 'example.com',
+    #                   selector: 'mail',
+    #                   private_key: File.read('key.pem'))
+    #   mail.deliver!
+    def dkim_sign!(domain:, selector:, private_key:, **options)
+      source = Mail::DKIM.sign(encoded_without_dkim,
+                               domain: domain,
+                               selector: selector,
+                               private_key: private_key,
+                               **options)
+      dkim_commit_signed(source)
+      self
+    end
+
+    # Sign and return the raw signed message without modifying this
+    # object.
+    def dkim_signed(**options)
+      Mail::DKIM.sign(encoded_without_dkim, **options)
+    end
+
+    # True after #dkim_sign! has been applied to this message.
+    def dkim_signed?
+      !@dkim_signed_source.nil?
+    end
+
+    # Verify every DKIM-Signature on this message using its original
+    # raw bytes when available (received messages), otherwise the
+    # current encoded form.  Each signature gets its own result.
+    def dkim_verify(resolver:, **options)
+      Mail::DKIM.verify(self, resolver: resolver, **options)
+    end
+
+    def encoded_without_dkim
+      @dkim_signed_source = nil
+      encoded
     end
 
     def without_attachments!
@@ -1975,6 +2021,19 @@ module Mail
   private
 
     HEADER_SEPARATOR = /#{Constants::LAX_CRLF}#{Constants::LAX_CRLF}/
+
+    def dkim_commit_signed(source)
+      @dkim_signed_source = source
+      # Expose the signature through the parsed header for inspection
+      # (mail['DKIM-Signature']).  The memo above, not this field's
+      # encoding, is what gets transmitted.
+      header_block, = Mail::DKIM::Canonicalization.split_message(source)
+      Mail::DKIM::Canonicalization.parse_headers(header_block).reverse_each do |name, value|
+        if name.downcase == 'dkim-signature'
+          header['dkim-signature'] = value
+        end
+      end
+    end
 
     #  2.1. General Description
     #   A message consists of header fields (collectively called "the header
