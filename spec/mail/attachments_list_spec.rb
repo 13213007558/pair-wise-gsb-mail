@@ -273,6 +273,14 @@ RSpec.describe "reading emails with attachments" do
       expect(mail.attachments.first.filename).to eq "This is a test.txt"
     end
 
+    it "should assemble an RFC 2231 filename from numeric-ordered, mixed-encoded continuation sections" do
+      mail = read_fixture('emails/attachment_emails/attachment_rfc2231_continuation.eml')
+      expect(mail.attachments.length).to eq 1
+      # Sections 3-5 form the UTF-8 bytes of あ split across three
+      # sections; sections 10 and 11 must come after 9, not before 2.
+      expect(mail.attachments.first.filename).to eq "000102あ060708091011"
+    end
+
     it "should decode an attachment without ascii compatible filename" do
       mail = read_fixture('emails/attachment_emails/attachment_nonascii_filename.eml')
       expect(mail.attachments.length).to eq 1

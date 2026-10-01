@@ -39,8 +39,57 @@ RSpec.describe Mail::ParameterHash do
 
   it "should return a name list concatenated" do
     hash = Mail::ParameterHash.new
-    hash.merge!({'value*1' => 'one', 'value*2' => 'two'})
+    hash.merge!({'value*0' => 'one', 'value*1' => 'two'})
     expect(hash['value']).to eq 'onetwo'
+  end
+
+  it "sorts continuation sections numerically for multi-digit section numbers" do
+    hash = Mail::ParameterHash.new
+    (0..11).each { |i| hash["filename*#{i}"] = "%02d" % i }
+    expect(hash['filename']).to eq ('00'..'11').to_a.join
+  end
+
+  it "assembles a UTF-8 multibyte character split across section boundaries" do
+    hash = Mail::ParameterHash.new
+    hash.merge!({'name*0*' => "utf-8''",
+                 'name*1*' => '%E3',
+                 'name*2*' => '%81',
+                 'name*3*' => '%82'})
+    expect(hash['name']).to eq 'あ'
+  end
+
+  it "mixes percent-encoded sections with plain sections" do
+    hash = Mail::ParameterHash.new
+    hash.merge!({'value*0*' => "us-ascii'en'%2A",
+                 'value*1'  => 'plain',
+                 'value*2*' => '%2A'})
+    expect(hash['value']).to eq '*plain*'
+  end
+
+  it "ignores sections after a gap and decodes the contiguous prefix" do
+    hash = Mail::ParameterHash.new
+    hash.merge!({'value*0' => 'ab', 'value*2' => 'cd'})
+    expect(hash['value']).to eq 'ab'
+  end
+
+  it "falls back to the plain value when continuation sections do not start at zero" do
+    hash = Mail::ParameterHash.new
+    hash.merge!({'value*1' => 'one', 'value*2' => 'two', 'value' => 'plain'})
+    expect(hash['value']).to eq 'plain'
+  end
+
+  it "returns nil deterministically for a malformed non-zero-starting section list" do
+    hash = Mail::ParameterHash.new
+    hash.merge!({'value*1' => 'one', 'value*2' => 'two'})
+    expect(hash['value']).to be_nil
+  end
+
+  it "is deterministic when a section number is duplicated" do
+    2.times do
+      hash = Mail::ParameterHash.new
+      hash.merge!({'value*0' => 'a', 'value*1' => 'b', 'VALUE*1' => 'X'})
+      expect(hash['value']).to eq 'aX'
+    end
   end
 
   it "should return a name list concatenated and unencoded" do
