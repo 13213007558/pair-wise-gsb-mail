@@ -1541,6 +1541,26 @@ module Mail
       multipart? && /^report$/i.match?(sub_type)
     end
 
+    # Returns true if the message is multipart/related
+    def multipart_related?
+      multipart? && /^related$/i.match?(sub_type)
+    end
+
+    # Parses this multipart/related container and identifies its root and resources.
+    def related_parts(extractor = nil, resource_reference_extractor: nil, &block)
+      related_container = self if multipart_related?
+      related_container ||= all_parts.detect { |part| part.respond_to?(:multipart_related?) && part.multipart_related? }
+      return nil unless related_container
+
+      Mail::RelatedPartSet.parse(
+        related_container,
+        extractor,
+        resource_reference_extractor: resource_reference_extractor,
+        &block
+      )
+    end
+    alias_method :related, :related_parts
+
     # Returns true if the message is a multipart/report; report-type=delivery-status;
     def delivery_status_report?
       multipart_report? && /^delivery-status$/i.match?(content_type_parameters['report-type'])
