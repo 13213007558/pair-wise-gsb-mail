@@ -57,6 +57,8 @@ module Mail # :doc:
   require 'mail/encodings/quoted_printable'
   require 'mail/encodings/unix_to_unix'
 
+  require 'mail/format_flowed'
+
   require 'mail/matchers/has_sent_mail'
   require 'mail/matchers/attachment_matchers'
 

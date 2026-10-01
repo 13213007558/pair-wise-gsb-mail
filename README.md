@@ -161,6 +161,26 @@ I have tried to simplify it some:
    provide encoded parameter values when you call the parameter names through the
    <code>object.parameters['<parameter_name>']</code> method call.
 
+### Format=Flowed (RFC 3676)
+
+Plain text bodies sent as <tt>text/plain; format=flowed</tt> can be turned back into
+logical paragraphs and re-wrapped to any width with <code>Mail::FormatFlowed</code>:
+
+    paragraphs = Mail::FormatFlowed.decode(mail.body.decoded, del_sp: false)
+    # => [#<Mail::FormatFlowed::Paragraph @quote_depth=0, @text="...">, ...]
+
+    Mail::FormatFlowed.encode(paragraphs, width: 72)   # physical lines again
+    Mail::FormatFlowed.rewrap(mail.body.decoded, width: 72)  # decode + encode
+
+Decoding joins flowed physical lines into logical paragraphs (preserving quote
+depth, un-stuffing lines that start with "From ", ">" or a space, and keeping the
+"-- " signature separator and blank lines as fixed lines). Encoding wraps at the
+given width measured in encoded bytes without splitting UTF-8 characters; words
+that cannot fit the soft width keep their semantics on their own line while the
+RFC 5322 hard limit of 998 octets is always respected. Pass <code>del_sp: true</code>
+for bodies sent with <tt>DelSp=yes</tt>, which allows breaking long words (e.g. CJK
+text without spaces) at any character boundary.
+
 ## Contributing
 
 Please do!  Contributing is easy in Mail.  Please read the [CONTRIBUTING.md](CONTRIBUTING.md) document for more info.
