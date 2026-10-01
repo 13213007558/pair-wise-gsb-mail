@@ -19,15 +19,17 @@ module Mail
         ::Mail::Utilities.to_lf ::Mail::Utilities.to_crlf(str).gsub(/(?:=0D=0A|=0D|=0A)\r\n/, "\r\n").unpack1("M*")
       end
 
-      def self.encode(str)
-        ::Mail::Utilities.to_crlf [::Mail::Utilities.to_lf(str)].pack("M")
+      def self.encode(str, rfc3676_soft_line_breaks: false)
+        packed = [::Mail::Utilities.to_lf(str)].pack("M")
+        packed = packed.gsub("=3D0A", "=0A") if rfc3676_soft_line_breaks
+        ::Mail::Utilities.to_crlf packed
       end
 
       def self.cost(str)
         # These bytes probably do not need encoding
         c = str.count("\x9\xA\xD\x20-\x3C\x3E-\x7E")
         # Everything else turns into =XX where XX is a
-        # two digit hex number (taking 3 bytes)
+        # two hex characters (taking 3 bytes)
         total = (str.bytesize - c)*3 + c
         total.to_f/str.bytesize
       end

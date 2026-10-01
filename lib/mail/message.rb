@@ -1802,6 +1802,7 @@ module Mail
         part.ready_to_send!
       end
       add_required_fields
+      configure_flowed_body
     end
 
     # Outputs an encoded string representation of the mail message including
@@ -1986,6 +1987,7 @@ module Mail
     def parse_message
       header_part, body_part = raw_source.lstrip.split(HEADER_SEPARATOR, 2)
       self.header = header_part
+      @physical_flowed_body = physical_flowed_body?
       self.body   = body_part
     end
 
@@ -2005,6 +2007,7 @@ module Mail
         self.text_part = value
       else
         @body_raw = value
+        @logical_body = true
       end
     end
 
@@ -2014,7 +2017,7 @@ module Mail
       @body_raw = nil
       separate_parts if @separate_parts
 
-      add_encoding_to_body
+      configure_body
     end
 
     def set_envelope_header
@@ -2040,6 +2043,39 @@ module Mail
       if has_content_transfer_encoding?
         @body.encoding = content_transfer_encoding
       end
+    end
+
+    def configure_body
+      add_encoding_to_body
+      configure_flowed_body
+    end
+
+    def configure_flowed_body
+      return unless @body && !@body.multipart?
+
+      unless text?
+        @body.format = nil
+        @body.del_sp = nil
+        @body.flowed_source = false
+        @body.logical_source = false
+        return
+      end
+
+      parameters = content_type_parameters
+      if parameters
+        @body.format = parameters["format"]
+        @body.del_sp = parameters["delsp"]
+        @body.flowed_source = @physical_flowed_body == true
+        @body.logical_source = !@physical_flowed_body && @logical_body == true
+      end
+    end
+
+    def physical_flowed_body?
+      text? && !multipart? &&
+        content_type_parameters &&
+        content_type_parameters["format"].to_s.downcase == "flowed"
+    rescue StandardError
+      false
     end
 
     def identify_and_set_transfer_encoding

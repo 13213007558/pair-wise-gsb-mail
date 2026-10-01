@@ -167,11 +167,17 @@ module Mail
           # Decode then encode to normalize and allow transforming
           # from base64 to Q-P and vice versa
           decoded = dec.decode(raw_source)
+          decoded = encode_flowed(decoded)
+          decoded = prepare_flowed_for_transfer(decoded, enc) if flowed? && (flowed_source? || logical_source?)
           if defined?(Encoding) && charset && charset != "US-ASCII"
             decoded = decoded.encode(charset)
             decoded.force_encoding('BINARY') unless Encoding.find(charset).ascii_compatible?
           end
-          enc.encode(decoded)
+          if enc == Mail::Encodings::QuotedPrintable && !quoted_printable_encode_options.empty?
+            enc.encode(decoded, **quoted_printable_encode_options)
+          else
+            enc.encode(decoded)
+          end
         end
       end
     end
@@ -180,7 +186,7 @@ module Mail
       if !Encodings.defined?(encoding)
         raise UnknownEncodingType, "Don't know how to decode #{encoding}, please call #encoded and decode it yourself."
       else
-        Encodings.get_encoding(encoding).decode(raw_source)
+        decode_flowed(Encodings.get_encoding(encoding).decode(raw_source))
       end
     end
 
@@ -214,6 +220,9 @@ module Mail
 
     # Returns and sets the original character encoding
     attr_accessor :charset
+
+    attr_accessor :format, :del_sp, :flowed_width
+    attr_writer :flowed_source, :logical_source
 
     # Returns and sets the preamble as a string (any text that is before the first MIME boundary)
     attr_accessor :preamble
@@ -266,6 +275,51 @@ module Mail
     end
 
     private
+
+    def flowed?
+      format.to_s.downcase == "flowed"
+    end
+
+    def flowed_source?
+      @flowed_source == true
+    end
+
+    def logical_source?
+      @logical_source == true
+    end
+
+    def decode_flowed(decoded)
+      return decoded unless flowed? && flowed_source?
+
+      Mail::RFC3676.decode(decoded, del_sp: del_sp?)
+    end
+
+    def encode_flowed(decoded)
+      return decoded unless flowed? && (flowed_source? || logical_source?)
+      @logical_source = true
+
+      Mail::RFC3676.encode(
+        Utilities.to_lf(decoded),
+        del_sp: del_sp?,
+        width: flowed_width || Mail::RFC3676::DEFAULT_WIDTH
+      )
+    end
+
+    def del_sp?
+      del_sp.to_s.downcase == "yes"
+    end
+
+    def prepare_flowed_for_transfer(decoded, encoding)
+      return decoded unless encoding == Mail::Encodings::QuotedPrintable
+
+      decoded.gsub(" \r\n", "=0A")
+    end
+
+    def quoted_printable_encode_options
+      return {} unless flowed? && (flowed_source? || logical_source?)
+
+      { rfc3676_soft_line_breaks: true }
+    end
 
     # split parts by boundary, ignore first part if empty, append final part when closing boundary was missing
     def extract_parts
