@@ -9,6 +9,7 @@ Compatibility:
 
 Features:
 
+* Add Mail::Flowed for explicit RFC 3676 format=flowed decoding and encoding (DelSp, quote levels, space-stuffing), with Mail.defaults flowed_display_width for the encode display width
 * Updated README to improve around sending multipart mail @kapfenho
 * Add delivery_interceptors method to Mail class to fetch registered interceptors @ghousemohamed
 

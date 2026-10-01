@@ -73,6 +73,12 @@ module Mail
       value ? @encode_language = value : @encode_language ||= 'en'
     end
 
+    # The display width (in characters) used by Mail::Flowed.encode when
+    # wrapping format=flowed (RFC 3676) plain text. Defaults to 78.
+    def flowed_display_width(value = nil)
+      value ? @flowed_display_width = value : @flowed_display_width ||= Mail::Flowed::DEFAULT_WIDTH
+    end
+
   end
 
 end
