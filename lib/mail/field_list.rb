@@ -20,7 +20,10 @@ module Mail
     end
 
     def add_field(field)
-      if field.singular?
+      # Resent-* fields are never replaced: each resending of a message
+      # prepends an independent block of them (RFC 5322 3.6.6), so every
+      # occurrence must be kept, in order.
+      if field.singular? && !resent_field?(field)
         replace_field field
       else
         insert_field field
@@ -66,6 +69,14 @@ module Mail
     end
 
     private
+
+    def resent_field?(field)
+      if field.respond_to?(:resent?)
+        field.resent?
+      else
+        Mail::Field::RESENT_FIELDS.include?(field.name.to_s.downcase)
+      end
+    end
 
     def select_fields(field_name)
       fields = select { |f| f.responsible_for? field_name }

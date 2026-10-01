@@ -2,6 +2,11 @@
 
 Breaking changes:
 * Mail::Field::FIELDS_MAP now contains class names, not Class instances (c960657)
+* Assigning a Resent-* field that already exists (e.g. `mail.resent_from = 'x'` twice)
+  now appends another field instead of replacing the existing one, matching how
+  Received fields behave and allowing multiple resent blocks per RFC 5322 3.6.6.
+  Use `mail.resent_from = nil` first, or Mail::Message#remove_resent_group, to
+  replace existing resent fields.
 
 Compatibility:
 
@@ -9,6 +14,13 @@ Compatibility:
 
 Features:
 
+* Support multiple Resent-* field groups (RFC 5322 3.6.6): parsing a message that was
+  resent more than once now keeps every block of Resent-Date/Resent-From/Resent-To/etc.
+  as an independent group instead of collapsing same-named fields.  Adds
+  Mail::Message#resent_groups, #add_resent_group, #remove_resent_group and
+  #resent_envelope (which builds a Mail::SmtpEnvelope from the most recent complete
+  group, stripping that group's Resent-Bcc from the sent copy only), plus the new
+  Mail::ResentFieldGroup class with per-group validation.
 * Updated README to improve around sending multipart mail @kapfenho
 * Add delivery_interceptors method to Mail class to fetch registered interceptors @ghousemohamed
 

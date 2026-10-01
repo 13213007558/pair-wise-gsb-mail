@@ -35,6 +35,13 @@ module Mail
 
     KNOWN_FIELDS = STRUCTURED_FIELDS + ['comments', 'subject']
 
+    # The Resent-* fields, one set of which is prepended to the message
+    # each time the message is resent (RFC 5322 3.6.6).  Each set forms
+    # an independent block, so a message that was resent more than once
+    # carries several same-named Resent-* fields.
+    RESENT_FIELDS = %w[ resent-date resent-from resent-sender resent-to
+                        resent-cc resent-bcc resent-message-id ].freeze
+
     FIELDS_MAP = {
       "to" => "ToField",
       "cc" => "CcField",
@@ -251,6 +258,12 @@ module Mail
       name.to_s.casecmp(field_name.to_s) == 0
     end
 
+    # Returns true if this is one of the Resent-* fields that make up a
+    # resending block (RFC 5322 3.6.6).
+    def resent?
+      RESENT_FIELDS.include?(name.to_s.downcase)
+    end
+
     def <=>(other)
       field_order_id <=> other.field_order_id
     end
@@ -269,14 +282,20 @@ module Mail
 
     FIELD_ORDER_LOOKUP = Hash[%w[
       return-path received
-      resent-date resent-from resent-sender resent-to
-      resent-cc resent-bcc resent-message-id
+      resent-date
       date from sender reply-to to cc bcc
       message-id in-reply-to references
       subject comments keywords
       mime-version content-type content-transfer-encoding
       content-location content-disposition content-description
     ].each_with_index.to_a]
+
+    # All Resent-* fields share a single order id.  Resent fields MUST NOT
+    # be reordered (RFC 5322 3.6), and giving them one shared id keeps each
+    # resent block contiguous and in its original relative order when a
+    # message with several resent blocks is parsed, instead of interleaving
+    # the blocks by field name.
+    RESENT_FIELDS.each { |name| FIELD_ORDER_LOOKUP[name] = FIELD_ORDER_LOOKUP['resent-date'] }
 
     private
 

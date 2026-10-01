@@ -3,6 +3,7 @@
 require 'mail/constants'
 require 'mail/utilities'
 require 'mail/yaml'
+require 'mail/smtp_envelope'
 
 module Mail
   # The Message class provides a single point of access to all things to do with an
@@ -1015,6 +1016,122 @@ module Mail
     #  mail.resent_to #=> ['mikel@test.lindsaar.net', 'ada@test.lindsaar.net']
     def resent_to=( val )
       header[:resent_to] = val
+    end
+
+    # Returns the resent field groups of this message as an array of
+    # Mail::ResentFieldGroup objects, most recent group first.
+    #
+    # Each time a message is resent, a new block of Resent-* fields is
+    # prepended to it (RFC 5322 3.6.6), so a message that has been resent
+    # more than once carries several independent groups of same-named
+    # Resent-Date, Resent-From, Resent-To, etc. fields.  Each group is
+    # delimited by its Resent-Date field.
+    #
+    # Example:
+    #
+    #  mail = Mail.new(raw_message_resent_twice)
+    #  mail.resent_groups.size            #=> 2
+    #  mail.resent_groups.first.resent_to #=> ['list@example.com']
+    def resent_groups
+      groups = []
+      current = nil
+      header.fields.each do |field|
+        next unless field.resent?
+        if current.nil? || field.responsible_for?('Resent-Date')
+          current = Mail::ResentFieldGroup.new
+          groups << current
+        end
+        current.fields << field
+      end
+      groups
+    end
+
+    # Prepends a new group of Resent-* fields to the message, leaving all
+    # existing fields — including any earlier resent groups — in their
+    # current order.  Returns the new Mail::ResentFieldGroup.
+    #
+    # The group is validated before it is added: Resent-Date and Resent-From
+    # are required (the date defaults to the current time), and Resent-Sender
+    # is required when Resent-From contains more than one address.
+    #
+    # Example:
+    #
+    #  mail.add_resent_group(from: 'resender@example.com',
+    #                        to:   'list@example.com',
+    #                        bcc:  'archive@example.com')
+    def add_resent_group(date: nil, from: nil, sender: nil, to: nil, cc: nil, bcc: nil, message_id: nil)
+      values = {
+        'Resent-Date'       => date || Time.now,
+        'Resent-From'       => from,
+        'Resent-Sender'     => sender,
+        'Resent-To'         => to,
+        'Resent-Cc'         => cc,
+        'Resent-Bcc'        => bcc,
+        'Resent-Message-ID' => message_id
+      }
+      fields = values.map do |name, value|
+        Mail::Field.new(name, value, charset) unless Utilities.blank?(value)
+      end.compact
+
+      group = Mail::ResentFieldGroup.new(fields)
+      group.validate!
+
+      # Prepend the block as-is so every existing field keeps its place.
+      header.fields.insert(0, *fields)
+      group
+    end
+
+    # Removes one resent field group from the message, leaving the other
+    # groups and all other fields in their current order.  Accepts a
+    # Mail::ResentFieldGroup or an index into #resent_groups (0 is the most
+    # recent group, and the default).  Returns the removed group, or nil if
+    # there is no such group.
+    #
+    # Example:
+    #
+    #  mail.remove_resent_group      # removes the most recent group
+    #  mail.remove_resent_group(1)   # removes the second most recent group
+    def remove_resent_group(group_or_index = 0)
+      group = group_or_index.is_a?(Mail::ResentFieldGroup) ? group_or_index : resent_groups[group_or_index]
+      return nil unless group
+
+      header.fields.delete_if do |field|
+        group.fields.any? { |group_field| group_field.equal?(field) }
+      end
+      group
+    end
+
+    # Builds a Mail::SmtpEnvelope for redelivering this message, using the
+    # most recent complete resent field group: the envelope sender is the
+    # group's Resent-Sender (or first Resent-From address) and the envelope
+    # recipients are the group's Resent-To, Resent-Cc and Resent-Bcc
+    # addresses.
+    #
+    # The envelope message is a copy of this message with that group's
+    # Resent-Bcc field removed; this message object is left untouched so it
+    # remains available for auditing.
+    #
+    # Raises Mail::Field::FieldError if no complete resent group is found.
+    def resent_envelope
+      groups = resent_groups
+      index = groups.index(&:complete?)
+      unless index
+        raise Mail::Field::FieldError, 'Cannot build a resent envelope: no complete resent field group found'
+      end
+      group = groups[index]
+
+      copy = dup
+      copy.smtp_envelope_from = group.envelope_from
+      copy.smtp_envelope_to = group.destinations
+
+      # Strip this group's Resent-Bcc from the copy that is sent out.
+      copy_group = copy.resent_groups[index]
+      copy_group.fields.each do |field|
+        next unless field.responsible_for?('Resent-Bcc')
+        copy.header.fields.delete_if { |copy_field| copy_field.equal?(field) }
+      end
+
+      Mail::SmtpEnvelope.new(copy)
     end
 
     # Returns the return path of the mail object, or sets it if you pass a string
