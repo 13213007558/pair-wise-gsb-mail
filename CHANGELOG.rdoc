@@ -11,6 +11,7 @@ Features:
 
 * Updated README to improve around sending multipart mail @kapfenho
 * Add delivery_interceptors method to Mail class to fetch registered interceptors @ghousemohamed
+* Add Mail::RelatedResource for resolving cid: and relative Content-Location references of a multipart/related HTML part within its proper MIME scope (RFC 2387/2392/2557), with resolved, ambiguous, not_found and not_applicable results
 
 Code Improvements:
 

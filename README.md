@@ -625,6 +625,62 @@ end
 ```
 See "Testing and extracting attachments" above for more details.
 
+### Resolving inline resources of HTML emails (multipart/related)
+
+HTML parts reference inline images either by Content-ID (`<img
+src="cid:...">`, RFC 2392) or by a URI relative to the root part's
+Content-Location (`<img src="images/logo.png">`, RFC 2557). Matching those by
+iterating over `attachments` and comparing filenames is unreliable:
+attachments cross MIME scope boundaries, inline parts are not attachments,
+and the HTML may use a CID rather than a filename.
+
+`Mail::RelatedResource` resolves references within the proper
+`multipart/related` container. The root part is determined from the
+container's `start` and `type` parameters (RFC 2387), and references are
+matched against the Content-ID and Content-Location headers of the
+container's direct body parts only.
+
+```ruby
+mail = Mail.read('newsletter.eml')
+
+result = mail.resolve_related_resource('cid:logo')
+result.status   #=> :resolved
+result.part     #=> Mail::Part (the image/png part)
+```
+
+A result is always in one of four states:
+
+* `:resolved` – exactly one part matched; see `result.part`
+* `:ambiguous` – more than one part matched (e.g. duplicate Content-IDs);
+  `result.parts` contains every candidate and no candidate is chosen for you
+* `:not_found` – the reference belongs to this container but nothing matched
+* `:not_applicable` – it cannot be answered from MIME parts (external
+  `http(s)`/`data:` URL, fragment reference, malformed reference, or no
+  related container)
+
+Resolve several references with one reusable resolver:
+
+```ruby
+resources = mail.related_resources
+html = resources.root.decoded
+html.scan(/src="([^"]+)"/).flatten.each do |ref|
+  result = resources.resolve(ref)
+  case result.status
+  when :resolved    then serve_inline(result.part)
+  when :ambiguous   then log_duplicate_cids(result.parts)
+  when :not_found   then log_missing_resource(ref)
+  when :not_applicable then leave_external_url_alone(ref)
+  end
+end
+```
+
+Resolution never accesses the network: an absolute `http`/`https` reference
+is resolved only when one of the container's own parts advertises a matching
+Content-Location. Scopes are isolated too – parts nested inside a
+`message/rfc822` attachment or a nested `multipart/related` group are not
+visible to the outer HTML; build a resolver from that nested message to
+resolve its own references.
+
 ## Using Mail with Testing or Spec'ing Libraries
 
 If mail is part of your system, you'll need a way to test it without actually

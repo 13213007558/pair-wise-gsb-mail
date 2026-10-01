@@ -1656,6 +1656,26 @@ module Mail
       end
     end
 
+    # Returns the Mail::RelatedResource resolver bound to the multipart/related
+    # container that owns +anchor+ (by default the HTML part), or nil when no
+    # such container exists.  The resolver can be used repeatedly to map the
+    # cid: and relative Content-Location references in an HTML body to MIME
+    # parts without leaving the related scope.
+    #
+    # See Mail::RelatedResource for the resolution rules and result states.
+    def related_resources(anchor = nil)
+      Mail::RelatedResource.find(self, anchor)
+    end
+
+    # Resolves one cid: or relative Content-Location reference from the part
+    # given by +anchor+ (by default the HTML part) to a MIME part.  Returns a
+    # Mail::RelatedResource::Result, which is in the +:not_applicable+ state
+    # when the message has no suitable multipart/related container.  No
+    # network access is performed.
+    def resolve_related_resource(reference, anchor = nil)
+      Mail::RelatedResource.resolve(self, reference, anchor)
+    end
+
     # Helper to add a html part to a multipart/alternative email.  If this and
     # text_part are both defined in a message, then it will be a multipart/alternative
     # message and set itself that way.

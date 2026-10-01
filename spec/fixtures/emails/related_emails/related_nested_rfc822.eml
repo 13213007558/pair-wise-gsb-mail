@@ -1,0 +1,52 @@
+MIME-Version: 1.0
+From: outer@example.com
+To: user@example.com
+Subject: Related resources nested via message/rfc822
+Message-ID: <outer-rfc822@example.com>
+Content-Type: multipart/mixed; boundary="outer-boundary"
+
+This is a multipart message in MIME format.
+--outer-boundary
+Content-Type: multipart/related; boundary="outer-related"; type="text/html"; start="<outer-root@example.com>"
+
+--outer-related
+Content-Type: text/html
+Content-ID: <outer-root@example.com>
+Content-Location: https://example.com/outer/index.html
+
+<html><body><img src="cid:logo"><img src="images/logo.png"></body></html>
+--outer-related
+Content-Type: image/png
+Content-ID: <logo>
+Content-Location: https://example.com/outer/images/logo.png
+Content-Disposition: inline; filename="outer-logo.png"
+Content-Transfer-Encoding: 7bit
+
+OUTER-LOGO-PNG-DATA
+--outer-related--
+--outer-boundary
+Content-Type: message/rfc822; name="forwarded.eml"
+Content-Disposition: attachment; filename="forwarded.eml"
+
+MIME-Version: 1.0
+From: inner@example.com
+To: user@example.com
+Subject: Inner forwarded message
+Message-ID: <inner-rfc822@example.com>
+Content-Type: multipart/related; boundary="inner-related"; type="text/html"
+
+--inner-related
+Content-Type: text/html
+Content-Location: https://example.com/inner/index.html
+
+<html><body><img src="cid:logo"></body></html>
+--inner-related
+Content-Type: image/gif
+Content-ID: <logo>
+Content-Location: https://example.com/inner/images/logo.gif
+Content-Disposition: inline; filename="inner-logo.gif"
+Content-Transfer-Encoding: 7bit
+
+INNER-LOGO-GIF-DATA
+--inner-related--
+--outer-boundary--
