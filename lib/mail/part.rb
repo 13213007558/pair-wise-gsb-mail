@@ -44,7 +44,25 @@ module Mail
     end
 
     def delivery_status_report_part?
-      (main_type =~ /message/i && sub_type =~ /delivery-status/i) && body =~ /Status:/
+      delivery_status_mime_type? && !delivery_status.nil?
+    end
+
+    # Returns the parsed Mail::DeliveryStatus for a message/delivery-status
+    # part, giving structured access to the per-message fields and to each
+    # per-recipient block, or nil if this part does not carry a parseable
+    # delivery status report.
+    def delivery_status
+      return nil unless delivery_status_mime_type?
+
+      unless defined? @delivery_status
+        @delivery_status = begin
+          status = Mail::DeliveryStatus.parse(body.decoded)
+          status.empty? ? nil : status
+        rescue Mail::DeliveryStatus::ParseError
+          nil
+        end
+      end
+      @delivery_status
     end
 
     def delivery_status_data
@@ -87,6 +105,10 @@ module Mail
     end
 
     private
+
+    def delivery_status_mime_type?
+      !!(main_type =~ /message/i && sub_type =~ /delivery-status/i)
+    end
 
     def get_return_values(key)
       if delivery_status_data[key].is_a?(Array)

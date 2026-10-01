@@ -39,6 +39,7 @@ module Mail # :doc:
   # Autoload mail send and receive classes.
   require 'mail/network'
 
+  require 'mail/delivery_status'
   require 'mail/message'
   require 'mail/part'
   require 'mail/header'

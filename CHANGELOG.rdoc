@@ -9,6 +9,7 @@ Compatibility:
 
 Features:
 
+* Add Mail::DeliveryStatus: structured read/write of message/delivery-status parts with per-message and per-recipient field blocks, type prefixes, unfolding, and preservation of unknown extension fields
 * Updated README to improve around sending multipart mail @kapfenho
 * Add delivery_interceptors method to Mail class to fetch registered interceptors @ghousemohamed
 

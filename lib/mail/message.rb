@@ -1558,6 +1558,14 @@ module Mail
       @delivery_status_part
     end
 
+    # Returns the parsed Mail::DeliveryStatus of this message's
+    # message/delivery-status part, or nil if this is not a delivery
+    # status report.  Gives structured access to the per-message fields
+    # and to each per-recipient block of the report.
+    def delivery_status
+      delivery_status_part and delivery_status_part.delivery_status
+    end
+
     def bounced?
       delivery_status_part and delivery_status_part.bounced?
     end
