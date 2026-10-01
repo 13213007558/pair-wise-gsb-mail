@@ -94,6 +94,12 @@ module Mail
       Utilities.param_decode(str, encoding)
     end
 
+    # Transcodes raw, already percent-decoded RFC 2231 bytes (possibly
+    # assembled from several continuation sections) to UTF-8.
+    def Encodings.param_decode_assembled(bytes, encoding)
+      Utilities.param_decode_assembled(bytes, encoding)
+    end
+
     # Decodes or encodes a string as needed for either Base64 or QP encoding types in
     # the =?<encoding>?[QB]?<string>?=" format.
     #

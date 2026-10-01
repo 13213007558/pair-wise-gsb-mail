@@ -463,12 +463,37 @@ module Mail
     end
 
     def Utilities.param_decode(str, encoding)
-      str = uri_parser.unescape(str)
-      str = charset_encoder.encode(str, encoding) if encoding
+      str = percent_decode(str)
+      return transcode_to_scrubbed_utf8(str.dup.force_encoding(Encoding::UTF_8)) unless encoding
+
+      str = charset_encoder.encode(str, encoding)
       transcode_to_scrubbed_utf8(str)
     rescue Encoding::UndefinedConversionError, ArgumentError, Encoding::ConverterNotFoundError
       warn "WARNING: Encoding conversion failed #{$!}"
       str.dup.force_encoding(Encoding::UTF_8)
+    end
+
+    # Percent-decode an RFC 2231 value (or a single section of one).
+    def Utilities.percent_decode(str)
+      uri_parser.unescape(str.to_s)
+    end
+
+    # Transcode raw, already percent-decoded RFC 2231 bytes to UTF-8.
+    # +encoding+ is the charset given in the charset'language' prefix
+    # (section 0 only); when absent the bytes are assumed to be UTF-8.
+    def Utilities.param_decode_assembled(bytes, encoding)
+      bytes = bytes.to_s.b
+      if encoding
+        begin
+          bytes = charset_encoder.encode(bytes, encoding)
+        rescue Encoding::UndefinedConversionError, ArgumentError, Encoding::ConverterNotFoundError
+          warn "WARNING: Encoding conversion failed #{$!}"
+        end
+        return transcode_to_scrubbed_utf8(bytes)
+      end
+      # No charset was declared: RFC 2231 sections are made of raw bytes,
+      # treat them as UTF-8 (the default for modern mail) and scrub.
+      transcode_to_scrubbed_utf8(bytes.dup.force_encoding(Encoding::UTF_8))
     end
 
     def Utilities.param_encode(str)

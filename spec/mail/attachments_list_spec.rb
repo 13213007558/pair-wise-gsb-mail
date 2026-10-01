@@ -209,6 +209,43 @@ RSpec.describe "Attachments" do
     end
   end
 
+  describe "RFC 2231 continuation filenames" do
+    def mail_with_disposition(disposition)
+      Mail.read_from_string("Content-Type: text/plain\r\n" \
+                            "Content-Disposition: #{disposition}\r\n\r\nhello\r\n")
+    end
+
+    it "joins twelve sections in numeric order" do
+      sections = (0..11).map { |i| "filename*#{i}=\"%02d\"" % i }.join(";\r\n ")
+      mail = mail_with_disposition("attachment;\r\n #{sections}")
+      expect(mail.header[:content_disposition].filename).
+        to eq (0..11).map { |i| "%02d" % i }.join
+    end
+
+    it "joins mixed extended and plain sections with split UTF-8 bytes" do
+      disposition = <<~DISPOSITION.chomp
+        attachment;
+         filename*0*=utf-8''%30%31;
+         filename*1=23;
+         filename*2*=%E6;
+         filename*3*=%97%A5%E6%9C%AC;
+         filename*4=.txt
+      DISPOSITION
+      mail = mail_with_disposition(disposition)
+      expect(mail.header[:content_disposition].filename).to eq "0123\u65e5\u672c.txt"
+    end
+
+    it "still decodes a single filename= parameter" do
+      mail = mail_with_disposition('attachment; filename="report.pdf"')
+      expect(mail.header[:content_disposition].filename).to eq "report.pdf"
+    end
+
+    it "still decodes a single filename*= parameter" do
+      mail = mail_with_disposition("attachment; filename*=utf-8''r%C3%A9sum%C3%A9.pdf")
+      expect(mail.header[:content_disposition].filename).to eq "r\u00e9sum\u00e9.pdf"
+    end
+  end
+
 end
 
 RSpec.describe "reading emails with attachments" do

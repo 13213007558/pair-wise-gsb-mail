@@ -22,6 +22,7 @@ Code Improvements:
 
 Bug Fixes:
 
+* Fix RFC 2231 parameter continuations to order sections numerically (so filename*10 no longer sorts before filename*2), percent-decode only extended (starred) sections, assemble raw bytes across sections before charset conversion (fixing multi-byte UTF-8 characters split on a section boundary), and handle missing or duplicated sections deterministically
 * Regression: Preserve message-level charset when adding parts (related to Rails ActionMailer) @shields
 * Regression: Adding a part should not reset the mail's charset to nil @railsbob
 
