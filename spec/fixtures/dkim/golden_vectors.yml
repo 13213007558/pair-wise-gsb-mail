@@ -1,0 +1,20 @@
+---
+public_key_base64: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAujI95cACJe4K1i0qTw5IqG2MTiGX8nlYs39N8bTjwCJyTxhnoMUDyapto9GqkyBNXiRsK+eS60iHzsRWtqN/8Kp7OQaSoPU7fWYuSFLAGxiFlNRt+GfQIaKdZlrrK9lPOh9Kd5creDdOhM6Og4qpBQ0I4vUv7xPr3y38HM1WknTa2i7RTleBc5iWEU0eaftWsytJ4nA4XdJ5A0aVOV9kszPT9Zwz7pEfuqj6A8UCRtjxPtZl1hWnAO82q1cwhKjP4OX/M7n2tXeINsBxMaCUHBxanT7+F/q+XiQc/AyzYyj7qfQgzMyLZ6BPu36lUbypBs4WO/lVEbXHDKcURvRKeQIDAQAB
+txt_record: v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAujI95cACJe4K1i0qTw5IqG2MTiGX8nlYs39N8bTjwCJyTxhnoMUDyapto9GqkyBNXiRsK+eS60iHzsRWtqN/8Kp7OQaSoPU7fWYuSFLAGxiFlNRt+GfQIaKdZlrrK9lPOh9Kd5creDdOhM6Og4qpBQ0I4vUv7xPr3y38HM1WknTa2i7RTleBc5iWEU0eaftWsytJ4nA4XdJ5A0aVOV9kszPT9Zwz7pEfuqj6A8UCRtjxPtZl1hWnAO82q1cwhKjP4OX/M7n2tXeINsBxMaCUHBxanT7+F/q+XiQc/AyzYyj7qfQgzMyLZ6BPu36lUbypBs4WO/lVEbXHDKcURvRKeQIDAQAB
+relaxed_relaxed: "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com;
+  q=dns/txt; s=sel; t=1700000000; h=from:subject:date:to:message-id:mime-version:content-type:content-transfer-encoding;
+  bh=yY65oZfxuOnPsZ5r3S8DCkQmZk4FMCz8H9A+h6epw0g=; b=Z9y6qH+mTEB9xEIn9EpjRLN71HKTqYKBERJkGsMACaS7iwSkcmPbKUyUx/Frdn1xgWk49Eb53ZuBuQ91UfKsOrsq5C5KoumBQ2VEBQ/BJ/1N7/H9aKE7TYLJowcyVOgrhN0Aso0//OC4nZT87YCkBfHnefDXC/3Y4D/p8b63MXp2WcmKCrTUb+o2v9xpcal5ZKuLF/2QCDGPpf2PKT7Y0HHFRaQZYO5ETAOR+EL1YxNBDptOzhQJAh7aQ7XegVVpmybeVKPLngxxYzg7I+1I0nq4LHXwytB4eogNK/EmqeHcx+EZwBdG/d/aTSUG4Zv6VfBjIVEBW6j7Y5WUgfWQlA==\r\nDate:
+  Tue, 14 Nov 2023 22:13:20 +0000\r\nFrom: jane@example.com\r\nTo: joe@example.org\r\nMessage-ID:
+  <golden@example.com>\r\nSubject: Golden vector\r\nMIME-Version: 1.0\r\nContent-Type:
+  text/plain;\r\n charset=UTF-8\r\nContent-Transfer-Encoding: 7bit\r\n\r\ntrailing\r\n\r\n"
+simple_simple: "DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=example.com;
+  q=dns/txt; s=sel; t=1700000000; h=from:subject:date:to:message-id:mime-version:content-type:content-transfer-encoding;
+  bh=yY65oZfxuOnPsZ5r3S8DCkQmZk4FMCz8H9A+h6epw0g=; b=CQjAzookwDJBocvE5t1zMgcm0Y0qZcTLZoIPzduyUWNlmKF/pHOVx5yEV4bO7JtFxWEF3NSDp15UBHTonX06JOgZ4RO8sq7zXqd5zGwqAOnUjTAVBV6pMLKnYzGqxIjx7amUI9Oxa3JHSduyqklirhxdWn/75euVRix/ePSKe5HhglQfSVk76f4/KlVHsQm5Gev+uWJ5Qo+Ixo8gpc9DTXR44tOVqMc20q4VtX3Jar8oyYkFCvYUJvevlO1hGZpxszgazRQltZx1jwIw/d810POdmFfXGwjCXU2MN2byoDzmOV4KLsRdKp5aIVzy9XEbkobjx6i13U3+C1dtV40nQQ==\r\nDate:
+  Tue, 14 Nov 2023 22:13:20 +0000\r\nFrom: jane@example.com\r\nTo: joe@example.org\r\nMessage-ID:
+  <golden@example.com>\r\nSubject: Golden vector\r\nMIME-Version: 1.0\r\nContent-Type:
+  text/plain;\r\n charset=UTF-8\r\nContent-Transfer-Encoding: 7bit\r\n\r\ntrailing\r\n\r\n"
+length_limited: "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com;
+  l=19; q=dns/txt; s=sel; t=1700000000; h=date:from:to:message-id:subject; bh=2Mm9I8nW/pLPqx0nqbKXf25bZ2ps+o/kYi6nZj8AEAU=;
+  b=YhP1j9f09rkHERk/ZNFS6AWmICS1ErnJgh9rCZGNN036O0wu3UgdLUq+gp/Up/pKF2A92wIa/nGCvuBWYPCbFLK3K+0UbfeNMLZ9E/AdefQ75RQ+54ZH+FRxCKQLi5czW7geVKuBOgRX/xLowrAGTZJRdnHUiLY10qSQ3924osLXL28oS+vs+JE1aW5dQCM5mVGdQSOqIkbi09581SHMR3mMH4ur1kfE9OmiHRIvIpxKsAbW2dOGpjS+VCj4FhzN6BKgYiXu34guKDw3eqLfcGpbjYinqew2VW29J1i7Ljxc9U1QrWMVvXnqE24VcZCNnY2FfrZcKmgRFNDGn5/k5A==\r\nDate:
+  Wed, 15 Nov 2023 00:53:20 -0000\r\nFrom: jane@example.com\r\nTo: joe@example.org\r\nMessage-ID:
+  <limited@example.com>\r\nSubject: Limited\r\n\r\nsigned body bytes\r\nmore\r\n"

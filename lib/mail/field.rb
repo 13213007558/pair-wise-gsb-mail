@@ -33,7 +33,7 @@ module Mail
                             resent-message-id resent-sender resent-to
                             return-path sender to ]
 
-    KNOWN_FIELDS = STRUCTURED_FIELDS + ['comments', 'subject']
+    KNOWN_FIELDS = STRUCTURED_FIELDS + ['comments', 'subject', 'dkim-signature']
 
     FIELDS_MAP = {
       "to" => "ToField",
@@ -46,6 +46,7 @@ module Mail
       "comments" => "CommentsField",
       "keywords" => "KeywordsField",
       "date" => "DateField",
+      "dkim-signature" => "DkimSignatureField",
       "from" => "FromField",
       "sender" => "SenderField",
       "reply-to" => "ReplyToField",
@@ -78,6 +79,7 @@ module Mail
       "comments" => "Comments",
       "keywords" => "Keywords",
       "date" => "Date",
+      "dkim-signature" => "DKIM-Signature",
       "from" => "From",
       "sender" => "Sender",
       "reply-to" => "Reply-To",

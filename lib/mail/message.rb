@@ -1804,6 +1804,35 @@ module Mail
       add_required_fields
     end
 
+    # Add an RFC 6376 RSA-SHA256 DKIM-Signature to this message.
+    #
+    #   mail.dkim_sign!(domain: 'example.com',
+    #                   selector: 'sel',
+    #                   private_key: pem_or_key)
+    #
+    # See Mail::DKIM::Signer for the full list of options (canonicalization
+    # algorithms, signed headers, l= body length, fixed timestamp, ...).
+    # Returns self so the message can still be delivered normally:
+    #
+    #   mail.dkim_sign!(**opts).deliver
+    def dkim_sign!(**options)
+      Mail::DKIM::Signer.new(**options).sign!(self)
+      self
+    end
+
+    # Verify the DKIM-Signature fields on this message.
+    #
+    # Prefer verifying the *raw received bytes* via Mail::DKIM.verify; this
+    # convenience re-encodes the parsed message and is mainly intended for
+    # messages that were just built.
+    def dkim_verify(resolver: nil)
+      Mail::DKIM::Verifier.new(resolver: resolver).verify(encoded)
+    end
+
+    def dkim_valid?(resolver: nil)
+      dkim_verify(resolver: resolver).any?(&:pass?)
+    end
+
     # Outputs an encoded string representation of the mail message including
     # all headers, attachments, etc.  This is an encoded email in US-ASCII,
     # so it is able to be directly sent to an email server.

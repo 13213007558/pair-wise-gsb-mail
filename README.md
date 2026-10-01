@@ -305,6 +305,53 @@ mail.delivery_method :logger
 mail.delivery_method :logger, logger: other_logger, severity: :debug
 ```
 
+### Signing with DKIM (RFC 6376)
+
+Mail can add an RSA-SHA256 DKIM signature entirely inside the library — no
+external command is needed. The signature is added to the message itself, so
+the bytes that are signed are exactly the bytes handed to your delivery
+method:
+
+```ruby
+mail.dkim_sign!(
+  domain: 'example.com',
+  selector: 'sel',
+  private_key: File.read('sel.pem'),   # an RSA PEM string or OpenSSL::PKey::RSA
+  header_canonicalization: 'relaxed', # 'simple' (default) or 'relaxed'
+  body_canonicalization: 'relaxed',   # 'simple' (default) or 'relaxed'
+  identity: '@example.com',           # optional i=
+  length: false                       # true => add l= with the whole body length
+)
+mail.deliver
+```
+
+A message can carry several independent signatures (RFC 6376 3.5); call
+`Mail::DKIM::Signer#sign!` once per key.
+
+### Verifying DKIM signatures
+
+Verification works from the **raw bytes as received** and never performs DNS
+implicitly. Inject the TXT record lookup so it stays testable and offline:
+
+```ruby
+resolver = lambda do |name|
+  # name looks like "sel._domainkey.example.com"
+  fetch_txt_record_somehow(name)
+end
+
+results = Mail::DKIM.verify(raw_mail, resolver: resolver)
+results.each do |r|
+  puts "#{r.status} d=#{r.domain} s=#{r.selector}: #{r.reason}"
+  # status is :pass, :fail, :neutral, :permerror or :temperror
+end
+results.any?(&:pass?)
+```
+
+Each `DKIM-Signature` field is evaluated independently: a failure on one
+signature never erases the result of another. A resolver may be any object
+responding to `call(name)` or `txt(name)` and returning the concatenated TXT
+record string (or `nil`).
+
 ### Getting Emails from a POP or IMAP Server:
 
 You can configure Mail to receive email using <code>retriever_method</code>

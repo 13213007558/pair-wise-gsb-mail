@@ -9,6 +9,11 @@ Compatibility:
 
 Features:
 
+* RFC 6376 DKIM: RSA-SHA256 signing and verification implemented inside Mail
+  (no external command). Supports simple/relaxed header and body
+  canonicalization, repeated-header bottom-up selection, the l= body length
+  tag, multiple independent signatures, and injectable private keys and DNS
+  TXT resolvers (Mail::DKIM, Message#dkim_sign!, Message#dkim_verify)
 * Updated README to improve around sending multipart mail @kapfenho
 * Add delivery_interceptors method to Mail class to fetch registered interceptors @ghousemohamed
 
