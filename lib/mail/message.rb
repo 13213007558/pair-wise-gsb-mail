@@ -1541,6 +1541,11 @@ module Mail
       multipart? && /^report$/i.match?(sub_type)
     end
 
+    # Returns true if the message is a multipart/related
+    def multipart_related?
+      multipart? && /^related$/i.match?(sub_type)
+    end
+
     # Returns true if the message is a multipart/report; report-type=delivery-status;
     def delivery_status_report?
       multipart_report? && /^delivery-status$/i.match?(content_type_parameters['report-type'])
@@ -1633,6 +1638,27 @@ module Mail
     def attachments
       parts.attachments
     end
+
+    # Parses a multipart/related entity and identifies its root and related
+    # resources. The caller supplies an extractor that returns references
+    # found in the root part. External references are never fetched.
+    def related_parts(*args,
+                      start: nil,
+                      resource_reference_extractor: nil,
+                      reference_extractor: nil,
+                      &block)
+      return unless multipart_related?
+
+      Mail::RelatedParts.new(
+        self,
+        *args,
+        start: start,
+        resource_reference_extractor: resource_reference_extractor || reference_extractor,
+        &block
+      )
+    end
+
+    alias_method :related, :related_parts
 
     def has_attachments?
       !attachments.empty?
