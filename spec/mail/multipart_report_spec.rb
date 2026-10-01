@@ -125,5 +125,114 @@ RSpec.describe "multipart/report emails" do
 
   end
 
+  describe "structured delivery status" do
+    let(:mail) { read_fixture('emails', 'multipart_report_emails', 'report_mixed_actions.eml') }
+
+    it "exposes a structured delivery status object" do
+      expect(mail.delivery_status).to be_a(Mail::DeliveryStatus)
+      expect(mail.delivery_status.recipients.size).to eq 3
+    end
+
+    it "separates per-message fields from recipient blocks" do
+      expect(mail.delivery_status.reporting_mta).to eq 'mx.example.com'
+      expect(mail.delivery_status.per_message.fields.map(&:name))
+        .to include('Reporting-MTA', 'X-Example-Account', 'Arrival-Date')
+    end
+
+    it "returns one result per recipient, in order" do
+      dsn = mail.delivery_status
+      expect(dsn.recipients.map(&:action)).to eq %w[delivered delayed failed]
+      expect(dsn.recipients.map(&:status)).to eq %w[2.0.0 4.4.1 5.1.1]
+    end
+
+    it "splits the type prefix from the value" do
+      recipient = mail.delivery_status.recipients.first
+      field = recipient.field('final-recipient')
+      expect(field.type).to eq 'rfc822'
+      expect(field.value).to eq 'delivered-user@example.com'
+    end
+
+    it "keeps Action, Status, Diagnostic-Code and Remote-MTA" do
+      failed = mail.delivery_status.recipients.last
+      expect(failed.action).to eq 'failed'
+      expect(failed.status).to eq '5.1.1'
+      expect(failed.remote_mta).to eq 'reject-mta.example.com'
+      expect(failed.diagnostic_code).to eq '550 5.1.1 User unknown'
+      expect(failed.body('diagnostic-code')).to eq 'smtp; 550 5.1.1 User unknown'
+    end
+
+    it "unfolds folded Diagnostic-Code values" do
+      delayed = mail.delivery_status.recipients[1]
+      expect(delayed.diagnostic_code).to eq '451 4.4.1 Temporary network failure; will retry shortly'
+    end
+
+    it "returns arrays from the message level accessors for multi-recipient reports" do
+      expect(mail.action).to eq %w[delivered delayed failed]
+      expect(mail.error_status).to eq %w[2.0.0 4.4.1 5.1.1]
+    end
+
+    it "is bounced because one recipient failed, and not retryable" do
+      expect(mail).to be_bounced
+      expect(mail).not_to be_retryable
+    end
+
+    it "preserves unknown extension fields on a parse/serialize/read round trip" do
+      dsn = mail.delivery_status
+
+      rebuilt_part = Mail::Part.new do
+        content_type 'message/delivery-status'
+        body dsn.encoded
+      end
+      rebuilt = rebuilt_part.delivery_status
+
+      expect(rebuilt.recipients.size).to eq 3
+      expect(rebuilt.per_message.body('x-example-account')).to eq '12345; alpha'
+      expect(rebuilt.recipients.map { |r| r.body('x-example-ticket') })
+        .to eq %w[INC-1 INC-2 INC-3]
+
+      original_blocks = dsn.blocks.map { |b| b.fields.map { |f| [f.name.downcase, f.body] } }
+      rebuilt_blocks = rebuilt.blocks.map { |b| b.fields.map { |f| [f.name.downcase, f.body] } }
+      expect(rebuilt_blocks).to eq original_blocks
+    end
+
+    it "generates a legal report that Mail reads back" do
+      dsn = Mail::DeliveryStatus.new do |status|
+        status.message_field 'Reporting-MTA', 'mx.generated.example.com', 'dns'
+        status.message_field 'X-Generated-By', 'mail gem'
+        status.add_recipient(
+          'Final-Recipient' => ['rfc822', 'ok@example.com'],
+          'Action' => 'delivered',
+          'Status' => '2.0.0',
+          'X-Recipient-Tag' => 'green'
+        )
+        status.add_recipient(
+          'Final-Recipient' => ['rfc822', 'gone@example.com'],
+          'Action' => 'failed',
+          'Status' => '5.1.1',
+          'Diagnostic-Code' => ['smtp', '550 5.1.1 unknown user'],
+          'X-Recipient-Tag' => 'red'
+        )
+      end
+
+      generated = Mail.new do
+        from 'MAILER-DAEMON@mx.generated.example.com'
+        to 'sender@example.com'
+        subject 'Generated delivery report'
+        content_type 'multipart/report; report-type=delivery-status'
+      end
+      generated.add_part(Mail::Part.new { content_type 'text/plain'; body 'see report' })
+      generated.add_part(Mail::Part.new { content_type 'message/delivery-status'; body dsn.encoded })
+
+      read_back = Mail.read_from_string(generated.to_s)
+      expect(read_back).to be_delivery_status_report
+      expect(read_back).to be_bounced
+      expect(read_back.delivery_status.recipients.map(&:action)).to eq %w[delivered failed]
+      expect(read_back.delivery_status.recipients.map { |r| r.body('x-recipient-tag') })
+        .to eq %w[green red]
+      expect(read_back.delivery_status.per_message.body('x-generated-by')).to eq 'mail gem'
+      expect(read_back.delivery_status.recipients.last.diagnostic_code).to eq '550 5.1.1 unknown user'
+    end
+  end
+
 end
 

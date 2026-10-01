@@ -562,6 +562,42 @@ Results in the same email as done using the block form
 @mail.retryable?       #=> false
 ```
 
+A DSN can describe more than one recipient.  Use `delivery_status` to get the
+structured [RFC 3464](https://www.rfc-editor.org/rfc/rfc3464) representation,
+which keeps the per-message fields separate from one block per recipient:
+
+```ruby
+status = @mail.delivery_status
+status.reporting_mta            #=> "mx.example.com"
+status.recipients.each do |recipient|
+  recipient.action              #=> "delivered", "delayed" or "failed"
+  recipient.status              #=> "5.1.1"
+  recipient.remote_mta          #=> "reject.example.com"
+  recipient.diagnostic_code     #=> "550 5.1.1 User unknown"
+  field = recipient.field('final-recipient')
+  field.type                    #=> "rfc822"
+  field.value                   #=> "mikel@dont.exist.com"
+  recipient.body('x-queue-id')  # unknown extension fields are preserved
+end
+```
+
+With a single recipient `@mail.action` returns a String, with several
+recipients it returns an Array.  `Mail::DeliveryStatus` can also generate a
+report that Mail can read back:
+
+```ruby
+dsn = Mail::DeliveryStatus.new do |s|
+  s.message_field 'Reporting-MTA', 'mx.example.com', 'dns'
+  s.add_recipient('Final-Recipient' => ['rfc822', 'a@example.com'],
+                  'Action' => 'failed', 'Status' => '5.1.1')
+end
+
+part = Mail::Part.new do
+  content_type 'message/delivery-status'
+  body dsn.encoded
+end
+```
+
 ### Attaching and Detaching Files
 
 You can just read the file off an absolute path, Mail will try

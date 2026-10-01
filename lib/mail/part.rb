@@ -47,56 +47,49 @@ module Mail
       (main_type =~ /message/i && sub_type =~ /delivery-status/i) && body =~ /Status:/
     end
 
+    # Returns the structured Mail::DeliveryStatus representation of this
+    # message/delivery-status part, distinguishing the per-message block from
+    # the per-recipient blocks.  Returns nil for other part types.
+    def delivery_status
+      @delivery_status ||= Mail::DeliveryStatus.new(body.to_s) if delivery_status_report_part?
+    end
+
+    # Deprecated: use #delivery_status.  Retained for backwards compatibility.
     def delivery_status_data
-      delivery_status_report_part? ? parse_delivery_status_report : {}
+      delivery_status
     end
 
     def bounced?
-      if action.is_a?(Array)
-        !!(action.first =~ /failed/i)
-      else
-        !!(action =~ /failed/i)
-      end
+      delivery_status ? delivery_status.bounced? : false
     end
 
-
-    # Either returns the action if the message has just a single report, or an
-    # array of all the actions, one for each report
+    # Returns the Action of a single-recipient report, or an array of the
+    # actions of every recipient block.
     def action
-      get_return_values('action')
+      delivery_status && delivery_status.action
     end
 
     def final_recipient
-      get_return_values('final-recipient')
+      delivery_status && delivery_status.final_recipient
     end
 
     def error_status
-      get_return_values('status')
+      delivery_status && delivery_status.status
     end
 
     def diagnostic_code
-      get_return_values('diagnostic-code')
+      delivery_status && delivery_status.diagnostic_code
     end
 
     def remote_mta
-      get_return_values('remote-mta')
+      delivery_status && delivery_status.remote_mta
     end
 
     def retryable?
-      !(error_status =~ /^5/)
+      delivery_status ? delivery_status.retryable? : false
     end
 
     private
-
-    def get_return_values(key)
-      if delivery_status_data[key].is_a?(Array)
-        delivery_status_data[key].map { |a| a.value }
-      elsif !delivery_status_data[key].nil?
-        delivery_status_data[key].value
-      else
-        nil
-      end
-    end
 
     # A part may not have a header.... so, just init a body if no header
     def parse_message
@@ -106,12 +99,8 @@ module Mail
         self.body   = body_part
       else
         self.header = "Content-Type: text/plain\r\n"
-        self.body   = raw_source
+        self.body = raw_source
       end
-    end
-
-    def parse_delivery_status_report
-      @delivery_status_data ||= Header.new(body.to_s.gsub("\r\n\r\n", "\r\n"))
     end
 
   end
