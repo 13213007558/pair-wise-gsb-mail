@@ -161,6 +161,32 @@ I have tried to simplify it some:
    provide encoded parameter values when you call the parameter names through the
    <code>object.parameters['<parameter_name>']</code> method call.
 
+## Format=Flowed (RFC 3676)
+
+Some plain text mail is sent as <code>text/plain; format=flowed</code>, where the
+physical line breaks are "soft" breaks meant to be rewrapped to the display width
+of the reader. Reading such a body verbatim shows the sender's breaks. Mail
+provides an explicit, opt-in interface for this; the default <code>#decoded</code>
+behaviour of text/plain is unchanged.
+
+Decoding a message on demand (quote depth, space-stuffing and the DelSp
+parameter are honoured, the signature separator <code>-- </code> is kept intact):
+
+  mail = Mail.new("Content-Type: text/plain; format=flowed\r\n\r\nfoo \r\nbar\r\n")
+  mail.format_flowed?  #=> true
+  mail.decode_flowed   #=> "foo bar"
+
+The same operations are available at the text level:
+
+  Mail::Flowed.decode("> foo \r\n> bar\r\n")              #=> "foo bar"
+  Mail::Flowed.decode("foo \r\nbar\r\n", del_sp: true)   #=> "foobar"
+  Mail::Flowed.encode("foo bar baz", width: 4)             #=> "foo \r\nbar \r\nbaz"
+
+Encoding wraps at the configured display width measured in characters, so
+multibyte characters are never split. A word longer than the width is kept
+intact on its own line and allowed to exceed the width. Lines starting with
+a space, "From" or ">" are space-stuffed automatically.
+
 ## Contributing
 
 Please do!  Contributing is easy in Mail.  Please read the [CONTRIBUTING.md](CONTRIBUTING.md) document for more info.

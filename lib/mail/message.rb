@@ -1915,6 +1915,28 @@ module Mail
       body.decoded
     end
 
+    # Returns true if the content type of this message declares
+    # RFC 3676 format=flowed text.
+    def format_flowed?
+      flowed_parameter?('format', 'flowed')
+    end
+
+    # Returns true if the content type of this message declares the
+    # RFC 3676 DelSp parameter.
+    def flowed_del_sp?
+      flowed_parameter?('delsp', 'yes')
+    end
+
+    # Decodes the body of this message as RFC 3676 format=flowed text,
+    # reassembling soft line breaks into logical lines and honouring
+    # the DelSp content-type parameter.
+    #
+    # This is an explicit opt-in: #decoded never applies format=flowed
+    # handling on its own, so plain text/plain messages are unaffected.
+    def decode_flowed
+      Mail::Flowed.decode(decode_body_as_text, del_sp: flowed_del_sp?)
+    end
+
     # Returns true if this part is an attachment,
     # false otherwise.
     def attachment?
@@ -2154,6 +2176,11 @@ module Mail
 
     def decode_body_as_text
       Encodings.transcode_charset decode_body, charset, 'UTF-8'
+    end
+
+    def flowed_parameter?(name, value)
+      params = content_type_parameters
+      !!(params && params[name].to_s.casecmp(value).zero?)
     end
   end
 end
