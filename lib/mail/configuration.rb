@@ -21,6 +21,32 @@ module Mail
       super
     end
 
+    # When true (the default), unstructured header fields containing
+    # non-US-ASCII content use the historical single-Q-encoded-word folding
+    # algorithm. When false, a compact encoder chooses for each encoded word
+    # the cheaper of quoted-printable (Q) and Base64 (B), jointly minimizing
+    # the wire byte count (field-name prefix, encoded-word wrappers, folding
+    # whitespace and CRLFs) while keeping every encoded word at <= 75
+    # characters and every physical line within
+    # +unstructured_header_line_length+.
+    def compact_header_encoding(value = nil)
+      if value.nil?
+        defined?(@compact_header_encoding) ? @compact_header_encoding : false
+      else
+        @compact_header_encoding = value
+      end
+    end
+
+    # Maximum physical line length emitted for unstructured headers.
+    def unstructured_header_line_length(value = nil)
+      if value.nil?
+        defined?(@unstructured_header_line_length) ?
+          @unstructured_header_line_length : 78
+      else
+        @unstructured_header_line_length = value
+      end
+    end
+
     def delivery_method(method = nil, settings = {})
       return @delivery_method if @delivery_method && method.nil?
       @delivery_method = lookup_delivery_method(method).new(settings)

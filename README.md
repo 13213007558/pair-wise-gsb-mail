@@ -654,6 +654,26 @@ Mail::TestMailer.deliveries.clear
 => []
 ```
 
+### Compact encoding of unstructured headers
+
+By default non-ASCII unstructured headers (Subject, Comments, …) are encoded
+as quoted-printable encoded words. Enable `compact_header_encoding` to let
+each encoded segment choose the shorter of quoted-printable (Q) and Base64
+(B), producing the smallest wire representation while keeping every encoded
+word within 75 characters and every physical line within the configured
+limit (78 by default). The legacy behaviour is unchanged unless you opt in.
+
+```ruby
+Mail.defaults do
+  compact_header_encoding true
+  # optional maximum physical line length (default 78)
+  unstructured_header_line_length 78
+end
+
+Mail::Field.new("Subject", "Her er æ ø å").encoded
+#=> "Subject: Her er=?UTF-8?B?IMOmIMO4IMOl?=\r\n"
+```
+
 There is also a set of RSpec matchers stolen/inspired by Shoulda's ActionMailer matchers (you'll want to set <code>delivery_method</code> as above too):
 
 ```ruby

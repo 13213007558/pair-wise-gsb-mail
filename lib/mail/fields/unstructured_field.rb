@@ -1,5 +1,7 @@
 # encoding: utf-8
 # frozen_string_literal: true
+
+require 'mail/encodings/compact_header_encoder'
 require 'mail/utilities'
 
 module Mail
@@ -44,10 +46,26 @@ module Mail
 
     def do_encode
       if value && !value.empty?
-        "#{wrapped_value}\r\n"
+        if compact?
+          "#{wrapped_value_compact}\r\n"
+        else
+          "#{wrapped_value}\r\n"
+        end
       else
         ''
       end
+    end
+
+    def compact?
+      Mail::Configuration.instance.compact_header_encoding
+    end
+
+    def line_limit
+      Mail::Configuration.instance.unstructured_header_line_length
+    end
+
+    def wrapped_value_compact
+      Encodings::CompactHeaderEncoder.encode(value, name, line_limit)
     end
 
     def do_decode
