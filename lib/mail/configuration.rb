@@ -73,6 +73,28 @@ module Mail
       value ? @encode_language = value : @encode_language ||= 'en'
     end
 
+    # When true, non US-ASCII unstructured header fields are encoded using a
+    # byte-minimal mix of Q and B encoded-words (see
+    # Mail::CompactHeaderEncoder). Defaults to false to preserve the
+    # historical all-Q behavior.
+    def compact_header_encoding(value = nil)
+      if value.nil?
+        defined?(@compact_header_encoding) ? @compact_header_encoding : false
+      else
+        @compact_header_encoding = value
+      end
+    end
+
+    # Maximum physical line length (in characters/bytes) when folding header
+    # fields. 78 per RFC 2822 section 2.1.1.
+    def header_line_length(value = nil)
+      if value.nil?
+        defined?(@header_line_length) ? @header_line_length : 78
+      else
+        @header_line_length = Integer(value)
+      end
+    end
+
   end
 
 end

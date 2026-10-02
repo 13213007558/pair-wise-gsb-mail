@@ -6,6 +6,7 @@ module Mail
   register_autoload :CommonDateField, 'mail/fields/common_date_field'
 
   register_autoload :UnstructuredField, 'mail/fields/unstructured_field'
+  register_autoload :CompactHeaderEncoder, 'mail/fields/compact_header_encoder'
   register_autoload :NamedUnstructuredField, 'mail/fields/named_unstructured_field'
   register_autoload :StructuredField, 'mail/fields/structured_field'
   register_autoload :OptionalField, 'mail/fields/optional_field'

@@ -54,6 +54,16 @@ module Mail
       Utilities.blank?(value) ? nil : Encodings.decode_encode(value, :decode)
     end
 
+    # When compact header encoding is enabled and the field value is
+    # non-US-ASCII UTF-8, let the byte-minimal encoder do the folding and
+    # encoded-word wrapping; otherwise keep the historical Q-encoding path.
+    def compact_encode?
+      Mail::Configuration.instance.compact_header_encoding &&
+        normalized_encoding == 'UTF-8' &&
+        decoded && !decoded.ascii_only? &&
+        decoded.valid_encoding?
+    end
+
     # 2.2.3. Long Header Fields
     #
     #  Each header field is logically a single line of characters comprising
@@ -81,7 +91,23 @@ module Mail
     #  preference to other places where the field could be folded, even if
     #  it is allowed elsewhere.
     def wrapped_value # :nodoc:
-      wrap_lines(name, fold("#{name}: ".length))
+      if compact_encode?
+        compact_wrapped_value
+      else
+        wrap_lines(name, fold("#{name}: ".length))
+      end
+    end
+
+    # Fold the value with the compact encoded-word encoder. If the value
+    # cannot fit the configured physical line limit (e.g. the limit is set
+    # absurdly low), fall back to the historical encoder.
+    def compact_wrapped_value
+      line_length = Mail::Configuration.instance.header_line_length
+      body = CompactHeaderEncoder.encode(decoded.to_s,
+                                         first_line_width: "#{name}: ".length,
+                                         line_length: line_length)
+      return wrap_lines(name, fold("#{name}: ".length)) if body.nil?
+      "#{name}: #{body}"
     end
 
     # 6.2. Display of 'encoded-word's
