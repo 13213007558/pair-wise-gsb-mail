@@ -180,6 +180,14 @@ module Mail
     Mail.new(mail_as_string)
   end
 
+  def self.reassemble_partials(*messages)
+    Mail::MessagePartial.reassemble(*messages)
+  end
+
+  def self.reassemble_partials!(*messages)
+    Mail::MessagePartial.reassemble!(*messages)
+  end
+
   def Mail.connection(&block)
     retriever_method.connection(&block)
   end
