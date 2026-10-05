@@ -47,6 +47,7 @@ module Mail # :doc:
   require 'mail/body'
   require 'mail/field'
   require 'mail/field_list'
+  require 'mail/message_partial_reassembler'
 
   register_autoload :Envelope, 'mail/envelope'
 
