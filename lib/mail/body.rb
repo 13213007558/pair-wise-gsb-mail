@@ -55,6 +55,15 @@ module Mail
       @parts = Mail::PartsList.new(coder['parts'])
     end
 
+    def initialize_copy(original)
+      super
+      @raw_source = @raw_source.dup
+      @preamble = @preamble.dup if @preamble
+      @epilogue = @epilogue.dup if @epilogue
+      @charset = @charset.dup if @charset
+      @parts = Mail::PartsList.new(parts.to_a.map(&:dup))
+    end
+
     # Matches this body with another body.  Also matches the decoded value of this
     # body with a string.
     #

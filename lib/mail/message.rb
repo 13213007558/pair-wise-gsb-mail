@@ -229,6 +229,10 @@ module Mail
     # define a delivery_handler
     attr_accessor :raise_delivery_errors
 
+    attr_accessor :transport_smtp_utf8
+
+    attr_accessor :preserve_transfer_encodings
+
     def self.default_charset; @@default_charset; end
     def self.default_charset=(charset); @@default_charset = charset; end
     self.default_charset = 'UTF-8'
@@ -390,7 +394,19 @@ module Mail
 
     def initialize_copy(original)
       super
+      @raw_source = @raw_source.dup if @raw_source
+      @raw_envelope = @raw_envelope.dup if @raw_envelope
       @header = @header.dup
+      @body = @body.dup if @body
+      @body_raw = @body_raw.dup if @body_raw
+
+      copied_parts = {}
+      original_parts = original.instance_variable_get(:@body) && original.body.parts.to_a
+      original_parts.to_a.each_with_index do |part, index|
+        copied_parts[part.object_id] = body.parts.to_a[index]
+      end
+      @text_part = copied_parts[@text_part.object_id] if @text_part && @body
+      @html_part = copied_parts[@html_part.object_id] if @html_part && @body
     end
 
     # Provides access to the raw source of the message as it was when it
@@ -1798,7 +1814,7 @@ module Mail
     def ready_to_send!
       identify_and_set_transfer_encoding
       parts.each do |part|
-        part.transport_encoding = transport_encoding
+        part.transport_encoding = transport_encoding unless preserve_transfer_encodings
         part.ready_to_send!
       end
       add_required_fields
@@ -1808,11 +1824,15 @@ module Mail
     # all headers, attachments, etc.  This is an encoded email in US-ASCII,
     # so it is able to be directly sent to an email server.
     def encoded
-      ready_to_send!
-      buffer = header.encoded
-      buffer << "\r\n"
-      buffer << body.encoded(content_transfer_encoding)
-      buffer
+      if transport_smtp_utf8
+        Mail::Address.with_smtp_utf8 { encoded_without_smtp_utf8 }
+      else
+        encoded_without_smtp_utf8
+      end
+    end
+
+    def prepare_for_transport(capabilities: {})
+      Mail::TransportPreparer.prepare(self, capabilities: capabilities)
     end
 
     def without_attachments!
@@ -2045,7 +2065,7 @@ module Mail
     def identify_and_set_transfer_encoding
       if body
         if body.multipart?
-          self.content_transfer_encoding = @transport_encoding
+          self.content_transfer_encoding = '7bit'
         else
           self.content_transfer_encoding = body.negotiate_best_encoding(@transport_encoding, allowed_encodings).to_s
         end
@@ -2154,6 +2174,14 @@ module Mail
 
     def decode_body_as_text
       Encodings.transcode_charset decode_body, charset, 'UTF-8'
+    end
+
+    def encoded_without_smtp_utf8
+      ready_to_send!
+      buffer = header.encoded
+      buffer << "\r\n"
+      buffer << body.encoded(content_transfer_encoding)
+      buffer
     end
   end
 end

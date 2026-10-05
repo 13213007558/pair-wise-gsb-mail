@@ -22,6 +22,18 @@ module Mail
   #  a.comments     #=> ['My email address']
   #  a.to_s         #=> 'Mikel Lindsaar <mikel@test.lindsaar.net> (My email address)'
   class Address
+    def self.with_smtp_utf8
+      previous = Thread.current[:mail_smtp_utf8]
+      Thread.current[:mail_smtp_utf8] = true
+      yield
+    ensure
+      Thread.current[:mail_smtp_utf8] = previous
+    end
+
+    def self.smtp_utf8?
+      Thread.current[:mail_smtp_utf8] == true
+    end
+
     def initialize(value = nil)
       if value.nil?
         @parsed = false
@@ -107,7 +119,8 @@ module Mail
     #  a.local #=> 'mikel'
     def local(output_type = :decode)
       parse unless @parsed
-      Encodings.decode_encode("#{@data.obs_domain_list}#{get_local.strip}", output_type) if get_local
+      value = "#{@data.obs_domain_list}#{get_local.strip}" if get_local
+      encode_address_component(value, output_type)
     end
 
     # Returns the domain part (the right hand side of the @ sign in the email address) of
@@ -117,7 +130,8 @@ module Mail
     #  a.domain #=> 'test.lindsaar.net'
     def domain(output_type = :decode)
       parse unless @parsed
-      Encodings.decode_encode(strip_all_comments(get_domain), output_type) if get_domain
+      value = strip_all_comments(get_domain) if get_domain
+      encode_address_component(value, output_type)
     end
 
     # Returns an array of comments that are in the email, or nil if there
@@ -253,6 +267,16 @@ module Mail
 
     def get_comments
       @data && @data.comments
+    end
+
+    def encode_address_component(value, output_type)
+      if value
+        if output_type == :encode && self.class.smtp_utf8?
+          Encodings.value_decode(value)
+        else
+          Encodings.decode_encode(value, output_type)
+        end
+      end
     end
   end
 end
