@@ -391,6 +391,16 @@ module Mail
     def initialize_copy(original)
       super
       @header = @header.dup
+      process_body_raw if @body_raw
+      original.body
+      if @body
+        @body.split!(boundary) if @separate_parts && !@body.multipart?
+        @body = @body.dup
+      end
+      @text_part = nil
+      @html_part = nil
+      map_copied_parts(original)
+      @smtp_envelope_to = @smtp_envelope_to.dup if @smtp_envelope_to
     end
 
     # Provides access to the raw source of the message as it was when it
@@ -635,6 +645,10 @@ module Mail
 
     def transport_encoding=( val )
       @transport_encoding = Mail::Encodings.get_encoding(val)
+    end
+
+    def prepare_for_transport(capabilities:, **options)
+      Mail::TransportPreparation.prepare(self, capabilities, **options)
     end
 
     # Returns the From value of the mail object as an array of strings of
@@ -1804,6 +1818,14 @@ module Mail
       add_required_fields
     end
 
+    def ensure_mime_structure!
+      parts.each(&:ensure_mime_structure!)
+      if body.multipart? && !multipart?
+        header['content-type'] = ContentTypeField.with_boundary('multipart/mixed').value
+        body.boundary = boundary
+      end
+    end
+
     # Outputs an encoded string representation of the mail message including
     # all headers, attachments, etc.  This is an encoded email in US-ASCII,
     # so it is able to be directly sent to an email server.
@@ -1973,6 +1995,23 @@ module Mail
     end
 
   private
+
+    def map_copied_parts(original)
+      links = {}
+      link_copied_parts(original, self, links)
+      @text_part = links[original.instance_variable_get(:@text_part)]
+      @html_part = links[original.instance_variable_get(:@html_part)]
+    end
+
+    def link_copied_parts(original, copy, links)
+      original.parts.each_with_index do |original_part, index|
+        copied_part = copy.parts[index]
+        next unless copied_part
+
+        links[original_part] = copied_part
+        link_copied_parts(original_part, copied_part, links) if original_part.multipart?
+      end
+    end
 
     HEADER_SEPARATOR = /#{Constants::LAX_CRLF}#{Constants::LAX_CRLF}/
 
