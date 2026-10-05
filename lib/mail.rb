@@ -60,6 +60,8 @@ module Mail # :doc:
   require 'mail/matchers/has_sent_mail'
   require 'mail/matchers/attachment_matchers'
 
+  require 'mail/smime'
+
   # Finally... require all the Mail.methods
   require 'mail/mail'
 end
