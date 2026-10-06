@@ -373,6 +373,51 @@ mail.decoded         #=> 'This is the body of the email...
 
 Many more methods available.
 
+### Reading and Writing mbox Archives (mboxrd)
+
+Mail can stream mboxrd archives (the format used by many Unix mail spools
+and "export as mbox" features) without loading the whole file into memory.
+The reader yields one record per message, preserving the envelope sender
+and date from each "From " separator line, and reports the byte range the
+message occupied in the original file:
+
+```ruby
+Mail::Mbox::Reader.open('archive.mbox') do |reader|
+  reader.each do |record|
+    record.envelope_sender #=> 'alice@example.com'
+    record.envelope_date   #=> 'Thu Jan  2 03:04:05 2020'
+    record.envelope_time   #=> #<DateTime 2020-01-02T03:04:05+00:00>
+    record.byte_range      #=> 0...4096 (separator line included)
+    record.content_range   #=> 48...4096 (message content only)
+    record.data            #=> raw message bytes, mboxrd ">From" unescaped
+    record.to_mail         #=> Mail::Message
+  end
+end
+```
+
+The input is read in chunks, so archives larger than memory are fine, and
+a final message without a trailing newline is still yielded. Lines in the
+message content that begin with "From " or ">From " are unescaped per the
+mboxrd rules.
+
+A line that looks like a separator but does not parse, or content before
+the first separator, raises Mail::Mbox::InvalidSeparatorError by default.
+Choose another recovery strategy with :on_invalid_separator:
+
+```ruby
+Mail::Mbox::Reader.new(io, on_invalid_separator: :skip)         # drop the line
+Mail::Mbox::Reader.new(io, on_invalid_separator: :keep_as_body) # keep it as content
+```
+
+The writer applies the inverse escaping, so content round-trips exactly:
+
+```ruby
+File.open('archive.mbox', 'wb') do |file|
+  writer = Mail::Mbox::Writer.new(file)
+  writer.write(mail.to_s, sender: 'alice@example.com', date: Time.now)
+end
+```
+
 ### Reading a Multipart Email
 
 ```ruby

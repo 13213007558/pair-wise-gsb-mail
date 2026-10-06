@@ -50,6 +50,8 @@ module Mail # :doc:
 
   register_autoload :Envelope, 'mail/envelope'
 
+  register_autoload :Mbox, 'mail/mbox'
+
   # Autoload header field elements and transfer encodings.
   require 'mail/elements'
   require 'mail/encodings'
