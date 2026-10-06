@@ -29,6 +29,7 @@ module Mail
                             content-id content-location content-transfer-encoding
                             content-type date from in-reply-to keywords message-id
                             mime-version received references reply-to
+                            arc-authentication-results arc-message-signature arc-seal
                             resent-bcc resent-cc resent-date resent-from
                             resent-message-id resent-sender resent-to
                             return-path sender to ]
@@ -36,6 +37,9 @@ module Mail
     KNOWN_FIELDS = STRUCTURED_FIELDS + ['comments', 'subject']
 
     FIELDS_MAP = {
+      "arc-authentication-results" => "ArcAuthenticationResultsField",
+      "arc-message-signature" => "ArcMessageSignatureField",
+      "arc-seal" => "ArcSealField",
       "to" => "ToField",
       "cc" => "CcField",
       "bcc" => "BccField",
@@ -68,6 +72,9 @@ module Mail
     }
 
     FIELD_NAME_MAP = {
+      "arc-authentication-results" => "ARC-Authentication-Results",
+      "arc-message-signature" => "ARC-Message-Signature",
+      "arc-seal" => "ARC-Seal",
       "to" => "To",
       "cc" => "Cc",
       "bcc" => "Bcc",
@@ -256,7 +263,7 @@ module Mail
     end
 
     def field_order_id
-      @field_order_id ||= FIELD_ORDER_LOOKUP.fetch(self.name.to_s.downcase, 100)
+      @field_order_id ||= arc_field_order_id || FIELD_ORDER_LOOKUP.fetch(name.to_s.downcase, 100)
     end
 
     def method_missing(name, *args, &block)
@@ -280,23 +287,44 @@ module Mail
 
     private
 
-    def create_field(name, value, charset)
-      parse_field(name, value, charset)
-    rescue Mail::Field::ParseError => e
-      field = Mail::UnstructuredField.new(name, value)
-      field.errors << [name, value, e]
-      field
-    end
-
-    def parse_field(name, value, charset)
-      value = unfold(value) if value.is_a?(String)
-
-      if klass = self.class.field_class_for(name)
-        klass.parse(value, charset)
-      else
-        OptionalField.parse(name, value, charset)
+      def arc_field_order_id
+        case name.to_s.downcase
+        when 'arc-seal'
+          arc_group_order(0)
+        when 'arc-message-signature'
+          arc_group_order(1)
+        when 'arc-authentication-results'
+          arc_group_order(2)
+        end
       end
-    end
+
+      def arc_group_order(kind)
+        instance = value.to_s[/(?:^|;)\s*i\s*=\s*(\d+)/, 1]
+        return -300 unless instance
+        -300 - (instance.to_i * 3) + kind
+      end
+
+      def create_field(name, value, charset)
+        parse_field(name, value, charset)
+      rescue Mail::Field::ParseError => e
+        field = Mail::UnstructuredField.new(name, value)
+        field.errors << [name, value, e]
+        field
+      end
+
+      def parse_field(name, value, charset)
+        value = unfold(value) if value.is_a?(String)
+
+        if klass = self.class.field_class_for(name)
+          if klass.respond_to?(:arc_field?) && klass.arc_field?
+            klass.parse(name, value, charset)
+          else
+            klass.parse(value, charset)
+          end
+        else
+          OptionalField.parse(name, value, charset)
+        end
+      end
 
     # 2.2.3. Long Header Fields
     #

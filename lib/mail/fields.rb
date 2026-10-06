@@ -12,6 +12,9 @@ module Mail
 
   register_autoload :BccField, 'mail/fields/bcc_field'
   register_autoload :CcField, 'mail/fields/cc_field'
+  register_autoload :ArcAuthenticationResultsField, 'mail/fields/arc_authentication_results_field'
+  register_autoload :ArcMessageSignatureField, 'mail/fields/arc_message_signature_field'
+  register_autoload :ArcSealField, 'mail/fields/arc_seal_field'
   register_autoload :CommentsField, 'mail/fields/comments_field'
   register_autoload :ContentDescriptionField, 'mail/fields/content_description_field'
   register_autoload :ContentDispositionField, 'mail/fields/content_disposition_field'
